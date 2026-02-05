@@ -50,6 +50,7 @@ INSURANCE_PROVIDERS = [
     "Cigna",
     "Humana",
     "Kaiser",
+    "Labcorp",
     "Medicare",
     "Medicaid",
     "United",
