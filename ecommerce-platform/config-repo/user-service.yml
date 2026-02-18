@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:replace-with-32-byte-minimum-secret-key}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/user_db}
+    username: ${SPRING_DATASOURCE_USERNAME:user_admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:user_pass}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false

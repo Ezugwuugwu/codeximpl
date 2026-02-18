@@ -1,0 +1,22 @@
+server:
+  port: 8086
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:replace-with-32-byte-minimum-secret-key}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5437/admin_db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:admin_pass}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+services:
+  product:
+    base-url: ${PRODUCT_SERVICE_URL:http://api-gateway:8080}
+  order:
+    base-url: ${ORDER_SERVICE_URL:http://api-gateway:8080}

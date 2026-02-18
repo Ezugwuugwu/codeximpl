@@ -1,0 +1,37 @@
+server:
+  port: 8084
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:replace-with-32-byte-minimum-secret-key}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/order_db}
+    username: ${SPRING_DATASOURCE_USERNAME:order_admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:order_pass}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+
+payment:
+  service:
+    base-url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
+
+resilience4j:
+  retry:
+    instances:
+      paymentService:
+        max-attempts: 3
+        wait-duration: 500ms
+  circuitbreaker:
+    instances:
+      paymentService:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s

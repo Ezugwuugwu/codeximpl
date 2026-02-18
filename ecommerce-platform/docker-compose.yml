@@ -1,0 +1,388 @@
+name: ecommerce-platform
+
+services:
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    ports:
+      - "${ZIPKIN_PORT:-9411}:9411"
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "${SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+
+  postgres-user:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: user_admin
+      POSTGRES_PASSWORD: user_pass
+    ports:
+      - "${POSTGRES_USER_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_admin -d user_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres-product:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_admin
+      POSTGRES_PASSWORD: product_pass
+    ports:
+      - "${POSTGRES_PRODUCT_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_admin -d product_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres-order:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: order_admin
+      POSTGRES_PASSWORD: order_pass
+    ports:
+      - "${POSTGRES_ORDER_PORT:-5435}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_admin -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres-payment:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment_admin
+      POSTGRES_PASSWORD: payment_pass
+    ports:
+      - "${POSTGRES_PAYMENT_PORT:-5436}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_admin -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres-admin:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: admin_db
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: admin_pass
+    ports:
+      - "${POSTGRES_ADMIN_PORT:-5437}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_user -d admin_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+      args:
+        MODULE: eureka-server
+    ports:
+      - "${EUREKA_PORT:-8761}:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+      args:
+        MODULE: config-server
+    ports:
+      - "${CONFIG_SERVER_PORT:-8888}:8888"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,native
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+    volumes:
+      - ./config-repo:/config-repo
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8888/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+      args:
+        MODULE: user-service
+    ports:
+      - "${USER_SERVICE_PORT:-8081}:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-user:5432/user_db
+      SPRING_DATASOURCE_USERNAME: user_admin
+      SPRING_DATASOURCE_PASSWORD: user_pass
+      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      SPRING_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+      args:
+        MODULE: product-service
+    ports:
+      - "${PRODUCT_SERVICE_PORT:-8082}:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-product:5432/product_db
+      SPRING_DATASOURCE_USERNAME: product_admin
+      SPRING_DATASOURCE_PASSWORD: product_pass
+      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      SPRING_REDIS_HOST: redis
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      postgres-product:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: cart-service/Dockerfile
+      args:
+        MODULE: cart-service
+    ports:
+      - "${CART_SERVICE_PORT:-8083}:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      SPRING_REDIS_HOST: redis
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+      args:
+        MODULE: order-service
+    ports:
+      - "${ORDER_SERVICE_PORT:-8084}:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-order:5432/order_db
+      SPRING_DATASOURCE_USERNAME: order_admin
+      SPRING_DATASOURCE_PASSWORD: order_pass
+      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      PAYMENT_SERVICE_URL: http://payment-service:8085
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      postgres-order:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      payment-service:
+        condition: service_started
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+      args:
+        MODULE: payment-service
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-8085}:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
+      SPRING_DATASOURCE_USERNAME: payment_admin
+      SPRING_DATASOURCE_PASSWORD: payment_pass
+      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: admin-service/Dockerfile
+      args:
+        MODULE: admin-service
+    ports:
+      - "${ADMIN_SERVICE_PORT:-8086}:8086"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-admin:5432/admin_db
+      SPRING_DATASOURCE_USERNAME: admin_user
+      SPRING_DATASOURCE_PASSWORD: admin_pass
+      PRODUCT_SERVICE_URL: http://api-gateway:8080
+      ORDER_SERVICE_URL: http://api-gateway:8080
+      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      postgres-admin:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+      args:
+        MODULE: notification-service
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8087}:8087"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+      args:
+        MODULE: api-gateway
+    ports:
+      - "${API_GATEWAY_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      CONFIG_SERVER_URL: http://config-server:8888
+      SPRING_REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+    depends_on:
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      cart-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      admin-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_PROXY_TARGET: http://api-gateway:8080
+    depends_on:
+      api-gateway:
+        condition: service_started
+

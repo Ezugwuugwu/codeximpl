@@ -1,0 +1,20 @@
+# Java/Maven
+**/target/
+.mvn/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env
+.env
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

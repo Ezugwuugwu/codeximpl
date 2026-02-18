@@ -1,0 +1,16 @@
+server:
+  port: 8082
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:replace-with-32-byte-minimum-secret-key}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5434/product_db}
+    username: ${SPRING_DATASOURCE_USERNAME:product_admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:product_pass}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false

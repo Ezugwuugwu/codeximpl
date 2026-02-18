@@ -1,0 +1,25 @@
+server:
+  port: 8085
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:replace-with-32-byte-minimum-secret-key}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5436/payment_db}
+    username: ${SPRING_DATASOURCE_USERNAME:payment_admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:payment_pass}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+
+payment:
+  stripe:
+    api-base-url: ${STRIPE_API_BASE_URL:https://api.stripe.com}
+    secret-key: ${STRIPE_SECRET_KEY:}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
