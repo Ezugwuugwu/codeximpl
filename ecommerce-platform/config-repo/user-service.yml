@@ -3,7 +3,12 @@ server:
 
 security:
   jwt:
-    secret: ${JWT_SECRET:replace-with-32-byte-minimum-secret-key}
+    secret: ${JWT_SECRET}
+
+admin:
+  seed:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
 
 spring:
   datasource:
@@ -12,8 +17,20 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:user_pass}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
     open-in-view: false
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false

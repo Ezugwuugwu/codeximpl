@@ -26,4 +26,17 @@ public class RabbitMqConfig {
             .to(commerceExchange)
             .with("payment.processed");
     }
+
+    // Receives async payment requests published by order-service via the outbox.
+    @Bean
+    public Queue paymentRequestsQueue() {
+        return new Queue("payment.requests", true);
+    }
+
+    @Bean
+    public Binding paymentRequestsBinding(Queue paymentRequestsQueue, DirectExchange commerceExchange) {
+        return BindingBuilder.bind(paymentRequestsQueue)
+            .to(commerceExchange)
+            .with("payment.requested");
+    }
 }

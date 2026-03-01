@@ -5,6 +5,8 @@ services:
     image: redis:7
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -16,6 +18,8 @@ services:
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
@@ -41,6 +45,8 @@ services:
       POSTGRES_PASSWORD: user_pass
     ports:
       - "${POSTGRES_USER_PORT:-5433}:5432"
+    volumes:
+      - postgres_user_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user_admin -d user_db"]
       interval: 10s
@@ -55,6 +61,8 @@ services:
       POSTGRES_PASSWORD: product_pass
     ports:
       - "${POSTGRES_PRODUCT_PORT:-5434}:5432"
+    volumes:
+      - postgres_product_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U product_admin -d product_db"]
       interval: 10s
@@ -69,6 +77,8 @@ services:
       POSTGRES_PASSWORD: order_pass
     ports:
       - "${POSTGRES_ORDER_PORT:-5435}:5432"
+    volumes:
+      - postgres_order_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U order_admin -d order_db"]
       interval: 10s
@@ -83,6 +93,8 @@ services:
       POSTGRES_PASSWORD: payment_pass
     ports:
       - "${POSTGRES_PAYMENT_PORT:-5436}:5432"
+    volumes:
+      - postgres_payment_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U payment_admin -d payment_db"]
       interval: 10s
@@ -97,6 +109,8 @@ services:
       POSTGRES_PASSWORD: admin_pass
     ports:
       - "${POSTGRES_ADMIN_PORT:-5437}:5432"
+    volumes:
+      - postgres_admin_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin_user -d admin_db"]
       interval: 10s
@@ -158,9 +172,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-user:5432/user_db
       SPRING_DATASOURCE_USERNAME: user_admin
       SPRING_DATASOURCE_PASSWORD: user_pass
-      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SPRING_REDIS_HOST: redis
       SPRING_RABBITMQ_HOST: rabbitmq
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       postgres-user:
@@ -189,7 +207,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-product:5432/product_db
       SPRING_DATASOURCE_USERNAME: product_admin
       SPRING_DATASOURCE_PASSWORD: product_pass
-      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_REDIS_HOST: redis
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
@@ -214,7 +232,7 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       CONFIG_SERVER_URL: http://config-server:8888
-      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_REDIS_HOST: redis
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
@@ -240,7 +258,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-order:5432/order_db
       SPRING_DATASOURCE_USERNAME: order_admin
       SPRING_DATASOURCE_PASSWORD: order_pass
-      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_RABBITMQ_HOST: rabbitmq
       PAYMENT_SERVICE_URL: http://payment-service:8085
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
@@ -271,10 +289,12 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-payment:5432/payment_db
       SPRING_DATASOURCE_USERNAME: payment_admin
       SPRING_DATASOURCE_PASSWORD: payment_pass
-      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_RABBITMQ_HOST: rabbitmq
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       postgres-payment:
@@ -303,7 +323,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: admin_pass
       PRODUCT_SERVICE_URL: http://api-gateway:8080
       ORDER_SERVICE_URL: http://api-gateway:8080
-      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      JWT_SECRET: ${JWT_SECRET}
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       postgres-admin:
@@ -352,7 +372,7 @@ services:
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       CONFIG_SERVER_URL: http://config-server:8888
       SPRING_REDIS_HOST: redis
-      JWT_SECRET: ${JWT_SECRET:-replace-with-32-byte-minimum-secret-key}
+      JWT_SECRET: ${JWT_SECRET}
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       redis:
@@ -386,3 +406,35 @@ services:
       api-gateway:
         condition: service_started
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@ecommerce.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpassfile:/pgadmin4/pgpassfile:ro
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+      postgres-product:
+        condition: service_healthy
+      postgres-order:
+        condition: service_healthy
+      postgres-payment:
+        condition: service_healthy
+      postgres-admin:
+        condition: service_healthy
+
+volumes:
+  rabbitmq_data:
+  redis_data:
+  postgres_user_data:
+  postgres_product_data:
+  postgres_order_data:
+  postgres_payment_data:
+  postgres_admin_data:
+  pgadmin_data:

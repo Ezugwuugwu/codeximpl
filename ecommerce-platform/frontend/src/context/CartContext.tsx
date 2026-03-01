@@ -30,7 +30,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     setLoading(true);
     try {
-      const response = await cartApi.getCart(token, userId);
+      const response = await cartApi.getCart(token);
       setCart(response);
     } finally {
       setLoading(false);
@@ -57,7 +57,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Login required");
     }
 
-    const updated = await cartApi.addItem(token, userId, {
+    const updated = await cartApi.addItem(token, {
       productId: product.id,
       productName: product.name,
       quantity,
@@ -73,7 +73,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Login required");
     }
 
-    const updated = await cartApi.removeItem(token, userId, productId);
+    const updated = await cartApi.removeItem(token, productId);
     setCart(updated);
   }, []);
 
@@ -84,7 +84,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Login required");
     }
 
-    await cartApi.clear(token, userId);
+    await cartApi.clear(token);
     setCart({
       userId,
       items: [],
@@ -103,7 +103,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     const created = await orderApi.create(token, {
-      userId,
       items: cart.items.map((item) => ({
         productId: item.productId,
         productName: item.productName,
@@ -113,7 +112,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       paymentIntentId,
     });
 
-    await cartApi.clear(token, userId);
+    await cartApi.clear(token);
     setCart({
       userId,
       items: [],

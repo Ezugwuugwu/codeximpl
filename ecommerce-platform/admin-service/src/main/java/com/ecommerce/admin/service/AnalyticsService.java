@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -19,10 +19,10 @@ public class AnalyticsService {
     private final RestClient productClient;
     private final RestClient orderClient;
 
-    public AnalyticsService(@Value("${services.product.base-url:http://localhost:8080}") String productBaseUrl,
-                            @Value("${services.order.base-url:http://localhost:8080}") String orderBaseUrl) {
-        this.productClient = RestClient.builder().baseUrl(productBaseUrl).build();
-        this.orderClient = RestClient.builder().baseUrl(orderBaseUrl).build();
+    public AnalyticsService(@Qualifier("productRestClient") RestClient productClient,
+                            @Qualifier("orderRestClient") RestClient orderClient) {
+        this.productClient = productClient;
+        this.orderClient = orderClient;
     }
 
     public Map<String, Object> overview(String bearerToken) {

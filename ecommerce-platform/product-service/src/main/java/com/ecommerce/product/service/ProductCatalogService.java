@@ -7,6 +7,8 @@ import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,8 +25,8 @@ public class ProductCatalogService {
         this.messagingTemplate = messagingTemplate;
     }
 
-    public List<Product> listActiveProducts() {
-        return repository.findByActiveTrue();
+    public Page<Product> listActiveProducts(Pageable pageable) {
+        return repository.findByActiveTrue(pageable);
     }
 
     public Product getById(Long id) {
@@ -34,7 +36,7 @@ public class ProductCatalogService {
 
     public List<Product> search(String term) {
         if (term == null || term.isBlank()) {
-            return listActiveProducts();
+            return repository.findByActiveTrue();
         }
         return repository.searchActive(term.trim());
     }

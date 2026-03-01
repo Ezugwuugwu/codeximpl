@@ -1,3 +1,12 @@
+export type PagedResponse<T> = {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  last: boolean;
+};
+
 export type Product = {
   id: number;
   name: string;
@@ -55,6 +64,11 @@ export type AuthResponse = {
   role: "USER" | "ADMIN";
 };
 
+export type RegisterResponse = {
+  message: string;
+  email: string;
+};
+
 export type CartItem = {
   productId: number;
   productName: string;
@@ -69,7 +83,6 @@ export type Cart = {
 };
 
 export type CreateOrderRequest = {
-  userId: string;
   items: Array<{
     productId: number;
     productName: string;
@@ -90,4 +103,16 @@ export type PaymentIntentCreateResponse = {
   clientSecret: string;
   publishableKey: string;
   status: string;
+};
+
+export type PaystackInitializeRequest = {
+  email: string;
+  amount: number;
+  currency?: string;
+};
+
+export type PaystackInitializeResponse = {
+  reference: string;
+  accessCode: string;
+  publicKey: string;
 };

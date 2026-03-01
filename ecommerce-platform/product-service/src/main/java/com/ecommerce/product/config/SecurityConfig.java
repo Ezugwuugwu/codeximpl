@@ -1,6 +1,6 @@
 package com.ecommerce.product.config;
 
-import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,7 +28,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/**", "/ws-inventory/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                .requestMatchers("/api/products", "/api/products/**").permitAll()
                 .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
@@ -47,8 +47,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(@Value("${security.jwt.secret:${JWT_SECRET:replace-with-32-byte-minimum-secret-key}}") String secret) {
-        SecretKey key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+    public JwtDecoder jwtDecoder(@Value("${security.jwt.secret}") String secret) {
+        SecretKey key = new SecretKeySpec(Base64.getDecoder().decode(secret), "HmacSHA256");
         return NimbusJwtDecoder.withSecretKey(key)
             .macAlgorithm(MacAlgorithm.HS256)
             .build();

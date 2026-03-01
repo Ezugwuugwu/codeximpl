@@ -5,6 +5,8 @@ import com.ecommerce.payment.service.dto.PaymentIntentCreateRequest;
 import com.ecommerce.payment.service.dto.PaymentIntentCreateResponse;
 import com.ecommerce.payment.service.dto.PaymentProcessRequest;
 import com.ecommerce.payment.service.dto.PaymentProcessResponse;
+import com.ecommerce.payment.service.dto.PaystackInitializeRequest;
+import com.ecommerce.payment.service.dto.PaystackInitializeResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,5 +32,10 @@ public class PaymentController {
     @PostMapping("/process")
     public ResponseEntity<PaymentProcessResponse> process(@Valid @RequestBody PaymentProcessRequest request) {
         return ResponseEntity.ok(service.process(request));
+    }
+
+    @PostMapping("/paystack/initialize")
+    public ResponseEntity<PaystackInitializeResponse> initializePaystack(@Valid @RequestBody PaystackInitializeRequest request) {
+        return ResponseEntity.ok(service.initializePaystack(request));
     }
 }

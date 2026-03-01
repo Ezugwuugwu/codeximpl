@@ -3,7 +3,7 @@ server:
 
 security:
   jwt:
-    secret: ${JWT_SECRET:replace-with-32-byte-minimum-secret-key}
+    secret: ${JWT_SECRET}
 
 spring:
   cloud:
@@ -18,8 +18,9 @@ spring:
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/auth/**,/api/users/**
+            - Path=/api/v1/auth/**,/api/v1/users/**
           filters:
+            - RewritePath=/api/v1/(?<segment>.*), /api/${segment}
             - name: CircuitBreaker
               args:
                 name: userServiceCircuit
@@ -28,8 +29,9 @@ spring:
         - id: product-service
           uri: lb://product-service
           predicates:
-            - Path=/api/products/**
+            - Path=/api/v1/products/**
           filters:
+            - RewritePath=/api/v1/(?<segment>.*), /api/${segment}
             - name: CircuitBreaker
               args:
                 name: productServiceCircuit
@@ -38,8 +40,9 @@ spring:
         - id: cart-service
           uri: lb://cart-service
           predicates:
-            - Path=/api/cart/**
+            - Path=/api/v1/cart/**
           filters:
+            - RewritePath=/api/v1/(?<segment>.*), /api/${segment}
             - name: CircuitBreaker
               args:
                 name: cartServiceCircuit
@@ -48,8 +51,9 @@ spring:
         - id: order-service
           uri: lb://order-service
           predicates:
-            - Path=/api/orders/**
+            - Path=/api/v1/orders/**
           filters:
+            - RewritePath=/api/v1/(?<segment>.*), /api/${segment}
             - name: CircuitBreaker
               args:
                 name: orderServiceCircuit
@@ -58,18 +62,31 @@ spring:
         - id: payment-service
           uri: lb://payment-service
           predicates:
-            - Path=/api/payments/**
+            - Path=/api/v1/payments/**
           filters:
+            - RewritePath=/api/v1/(?<segment>.*), /api/${segment}
             - name: CircuitBreaker
               args:
                 name: paymentServiceCircuit
                 fallbackUri: forward:/fallback/payment-service
 
+        - id: support-service
+          uri: lb://admin-service
+          predicates:
+            - Path=/api/v1/support/**
+          filters:
+            - RewritePath=/api/v1/(?<segment>.*), /api/${segment}
+            - name: CircuitBreaker
+              args:
+                name: adminServiceCircuit
+                fallbackUri: forward:/fallback/admin-service
+
         - id: admin-service
           uri: lb://admin-service
           predicates:
-            - Path=/api/admin/**
+            - Path=/api/v1/admin/**
           filters:
+            - RewritePath=/api/v1/(?<segment>.*), /api/${segment}
             - name: CircuitBreaker
               args:
                 name: adminServiceCircuit

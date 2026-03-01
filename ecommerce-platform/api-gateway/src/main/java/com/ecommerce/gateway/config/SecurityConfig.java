@@ -1,6 +1,6 @@
 package com.ecommerce.gateway.config;
 
-import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +31,9 @@ public class SecurityConfig {
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .cors(Customizer.withDefaults())
             .authorizeExchange(exchange -> exchange
-                .pathMatchers("/actuator/**", "/fallback/**", "/api/auth/**").permitAll()
+                .pathMatchers("/actuator/**", "/fallback/**").permitAll()
+                .pathMatchers("/api/v1/auth/**").permitAll()
+                .pathMatchers("/api/v1/products", "/api/v1/products/**").permitAll()
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .anyExchange().authenticated())
             .exceptionHandling(exceptionHandling -> exceptionHandling
@@ -42,8 +44,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public ReactiveJwtDecoder reactiveJwtDecoder(@Value("${security.jwt.secret:${JWT_SECRET:replace-with-32-byte-minimum-secret-key}}") String secret) {
-        SecretKey key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+    public ReactiveJwtDecoder reactiveJwtDecoder(@Value("${security.jwt.secret}") String secret) {
+        SecretKey key = new SecretKeySpec(Base64.getDecoder().decode(secret), "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(key)
             .macAlgorithm(MacAlgorithm.HS256)
             .build();

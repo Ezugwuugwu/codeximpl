@@ -13,11 +13,13 @@ const options: Array<{ id: SupportChannel; label: string }> = [
 
 function SupportTabs({ active, onSelect }: Props) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-gradient-to-r from-[#eef3f9] to-[#e8eff7] p-2 shadow-sm">
       {options.map((option) => (
         <button
-          className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-            active === option.id ? "border-ink bg-ink text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+          className={`rounded-full border px-5 py-2 text-base font-semibold tracking-[0.01em] transition ${
+            active === option.id
+              ? "border-[#1f3550] bg-[#1f3550] text-white shadow"
+              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
           }`}
           key={option.id}
           onClick={() => onSelect(option.id)}

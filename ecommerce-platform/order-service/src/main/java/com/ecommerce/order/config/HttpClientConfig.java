@@ -9,9 +9,8 @@ import org.springframework.web.client.RestClient;
 public class HttpClientConfig {
 
     @Bean
-    public RestClient paymentRestClient(@Value("${payment.service.base-url:http://localhost:8080}") String baseUrl) {
-        return RestClient.builder()
-            .baseUrl(baseUrl)
-            .build();
+    RestClient paymentRestClient(
+            @Value("${PAYMENT_SERVICE_URL:http://payment-service:8085}") String baseUrl) {
+        return RestClient.builder().baseUrl(baseUrl).build();
     }
 }

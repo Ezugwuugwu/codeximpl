@@ -1,35 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
-import { Elements } from "@stripe/react-stripe-js";
-import { loadStripe, Stripe } from "@stripe/stripe-js";
-import CardCheckoutForm from "../components/payments/CardCheckoutForm";
+import PaystackCheckoutButton from "../components/payments/PaystackCheckoutButton";
 import { useCart } from "../context/CartContext";
-import { paymentApi } from "../services/api";
-import { getAuthToken, getCurrentUserId } from "../utils/auth";
 
 function CartPage() {
   const navigate = useNavigate();
   const { cart, loading, removeFromCart, clearCart, placeOrder } = useCart();
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
+  const [latestOrderId, setLatestOrderId] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
-  const [preparingPayment, setPreparingPayment] = useState(false);
-  const [clientSecret, setClientSecret] = useState("");
-  const [paymentIntentId, setPaymentIntentId] = useState("");
-  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
 
   const items = cart?.items ?? [];
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0),
     [items]
   );
-
-  useEffect(() => {
-    setClientSecret("");
-    setPaymentIntentId("");
-    setStripePromise(null);
-  }, [subtotal, items.length]);
 
   const onRemove = async (productId: number) => {
     try {
@@ -42,6 +28,7 @@ function CartPage() {
   };
 
   const onClear = async () => {
+    setLatestOrderId(null);
     try {
       await clearCart();
       setMessageTone("success");
@@ -52,68 +39,28 @@ function CartPage() {
     }
   };
 
-  const onPrepareCardCheckout = async () => {
-    const token = getAuthToken();
-    const userId = getCurrentUserId();
-    if (!token || !userId) {
-      setMessageTone("error");
-      setMessage("Login required to checkout.");
-      return;
-    }
-    if (subtotal <= 0) {
-      setMessageTone("error");
-      setMessage("Cart is empty.");
-      return;
-    }
-
-    setPreparingPayment(true);
-    setMessage("");
-    try {
-      const intent = await paymentApi.createIntent(token, {
-        userId,
-        amount: Number(subtotal.toFixed(2)),
-        currency: "USD",
-      });
-      setClientSecret(intent.clientSecret);
-      setPaymentIntentId(intent.paymentIntentId);
-      setStripePromise(loadStripe(intent.publishableKey));
-      setMessageTone("success");
-      setMessage("Card checkout initialized. Enter your card details below.");
-    } catch (error) {
-      const providerMessage =
-        axios.isAxiosError(error) && typeof error.response?.data?.message === "string"
-          ? error.response.data.message
-          : "";
-      const text = providerMessage || (error instanceof Error ? error.message : "Unable to initialize card checkout.");
-      setMessageTone("error");
-      setMessage(text);
-    } finally {
-      setPreparingPayment(false);
-    }
+  const onPaymentError = (errorMessage: string) => {
+    setLatestOrderId(null);
+    setMessageTone("error");
+    setMessage(errorMessage);
   };
 
-  const onPaymentSuccess = async (confirmedPaymentIntentId: string) => {
+  const onPaystackSuccess = async (reference: string) => {
     setPlacing(true);
     setMessage("");
+    setLatestOrderId(null);
     try {
-      const order = await placeOrder(confirmedPaymentIntentId || paymentIntentId);
+      const order = await placeOrder("PAYSTACK:" + reference);
       setMessageTone("success");
       setMessage(`Payment successful and order placed. Order ID: ${order.id}`);
-      setClientSecret("");
-      setPaymentIntentId("");
-      setStripePromise(null);
+      setLatestOrderId(String(order.id));
     } catch (error) {
       const text = error instanceof Error ? error.message : "Payment succeeded but order creation failed.";
       setMessageTone("error");
-      setMessage(`${text} Contact support with payment ref ${confirmedPaymentIntentId}.`);
+      setMessage(`${text} Contact support with payment ref ${reference}.`);
     } finally {
       setPlacing(false);
     }
-  };
-
-  const onPaymentError = (errorMessage: string) => {
-    setMessageTone("error");
-    setMessage(errorMessage);
   };
 
   if (loading) {
@@ -130,9 +77,18 @@ function CartPage() {
       </div>
 
       {message && (
-        <p className={`rounded-xl p-3 text-sm ${messageTone === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
-          {message}
-        </p>
+        <div className={`rounded-xl p-3 text-sm ${messageTone === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+          <p>{message}</p>
+          {messageTone === "success" && latestOrderId && (
+            <p className="mt-1">
+              Your order will be on the way soon.{" "}
+              <Link className="font-bold text-blue-700 underline decoration-2 underline-offset-2 hover:text-blue-800" to="/admin#orders">
+                Click here
+              </Link>{" "}
+              to track your order.
+            </p>
+          )}
+        </div>
       )}
 
       {items.length === 0 ? (
@@ -161,9 +117,9 @@ function CartPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-slate-600">
-                    ${Number(item.unitPrice).toFixed(2)} x {item.quantity}
+                    ₦{Number(item.unitPrice).toFixed(2)} x {item.quantity}
                   </p>
-                  <p className="font-semibold">${(Number(item.unitPrice) * item.quantity).toFixed(2)}</p>
+                  <p className="font-semibold">₦{(Number(item.unitPrice) * item.quantity).toFixed(2)}</p>
                   <button
                     className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-700"
                     onClick={(event) => {
@@ -190,28 +146,23 @@ function CartPage() {
           </div>
 
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
-            <p className="text-lg font-semibold">Subtotal: ${subtotal.toFixed(2)}</p>
+            <p className="text-lg font-semibold">Subtotal: ₦{subtotal.toFixed(2)}</p>
             <div className="flex flex-wrap gap-2">
-              <button className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700" onClick={onClear} type="button">
+              <button
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+                onClick={onClear}
+                type="button"
+              >
                 Clear Cart
               </button>
-              {!clientSecret && (
-                <button className="rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-60" disabled={preparingPayment} onClick={onPrepareCardCheckout} type="button">
-                  {preparingPayment ? "Initializing Payment..." : "Checkout with Card"}
-                </button>
-              )}
+              <PaystackCheckoutButton
+                amountNgn={subtotal}
+                disabled={placing}
+                onError={onPaymentError}
+                onSuccess={onPaystackSuccess}
+              />
             </div>
-
-            {clientSecret && stripePromise && (
-              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Card Payment</p>
-                <p className="text-sm text-slate-600">Use your credit or debit card. Your payment is processed securely.</p>
-                <Elements options={{ clientSecret }} stripe={stripePromise}>
-                  <CardCheckoutForm clientSecret={clientSecret} onPaymentError={onPaymentError} onPaymentSuccess={onPaymentSuccess} />
-                </Elements>
-                {placing && <p className="text-sm text-slate-600">Finalizing your order...</p>}
-              </div>
-            )}
+            {placing && <p className="text-sm text-slate-600">Finalizing your order...</p>}
           </div>
         </div>
       )}

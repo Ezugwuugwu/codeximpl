@@ -1,7 +1,8 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, Fragment, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import StatCard from "../components/StatCard";
 import LiveAgentInboxPanel from "../components/admin/LiveAgentInboxPanel";
-import { adminApi, orderApi, productApi } from "../services/api";
+import { orderApi, productApi } from "../services/api";
 import type { AnalyticsOverview, CustomerOrder, Product, ProductCreateRequest } from "../types";
 
 type CategoryGroup = {
@@ -78,22 +79,47 @@ function AdminDashboardPage() {
   const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
   const [productActionError, setProductActionError] = useState("");
   const [productActionSuccess, setProductActionSuccess] = useState("");
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [refreshingOrders, setRefreshingOrders] = useState(false);
+  const [isAnalyticsExpanded, setIsAnalyticsExpanded] = useState(false);
 
   const token = useMemo(() => localStorage.getItem("auth_token") || "", []);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!token) {
-      setError("Login first to load admin analytics.");
+      navigate("/login", { replace: true });
+      return;
+    }
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (payload.role !== "ADMIN") {
+        navigate("/", { replace: true });
+        return;
+      }
+    } catch {
+      navigate("/login", { replace: true });
       return;
     }
 
-    Promise.all([adminApi.overview(token), productApi.list(token), orderApi.listAll(token)])
-      .then(([overview, productList, orderList]) => {
-        setData(overview);
+    setData({
+      timestamp: new Date().toISOString(),
+      productCount: 0,
+      openOrders: 0,
+      estimatedRevenueToday: 0,
+      conversionRate: 0,
+      alerts: "Loading...",
+    });
+
+    // Load with a large page size so all products/orders are available for stats.
+    Promise.allSettled([productApi.list(token, 0, 500), orderApi.listAll(token, 0, 500)]).then(
+      ([productsResult, ordersResult]) => {
+        const productList = productsResult.status === "fulfilled" ? productsResult.value.content : [];
+        const orderList = ordersResult.status === "fulfilled" ? ordersResult.value.content : [];
         setProducts([...productList].sort(productNewestFirst));
         setOrders(orderList);
-      })
-      .catch(() => setError("Failed to load admin data from backend services."));
+      }
+    );
   }, [token]);
 
   const categories = useMemo(() => {
@@ -191,6 +217,12 @@ function AdminDashboardPage() {
     () => (filteredOrders.length === 0 ? 0 : paidOrdersCount / filteredOrders.length),
     [filteredOrders.length, paidOrdersCount]
   );
+
+  const OPEN_ORDER_STATUSES = new Set(["CREATED", "PAYMENT_PENDING", "PAID", "FULFILLING", "SHIPPED"]);
+  const alerts = useMemo(() => {
+    const openCount = orders.filter((o) => OPEN_ORDER_STATUSES.has(o.status)).length;
+    return openCount > 0 ? `Orders pending fulfillment: ${openCount}` : "No critical incidents";
+  }, [orders]);
 
   const toDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -358,6 +390,19 @@ function AdminDashboardPage() {
     }
   };
 
+  const refreshOrders = async () => {
+    if (!token) return;
+    setRefreshingOrders(true);
+    try {
+      const result = await orderApi.listAll(token, 0, 500);
+      setOrders(result.content);
+    } catch {
+      // silently ignore refresh errors
+    } finally {
+      setRefreshingOrders(false);
+    }
+  };
+
   if (error) {
     return <p className="rounded-xl bg-red-50 p-4 text-red-700">{error}</p>;
   }
@@ -369,14 +414,27 @@ function AdminDashboardPage() {
   return (
     <section className="space-y-8">
       <div className="rounded-3xl bg-gradient-to-r from-slate-900 to-slate-700 p-6 text-white">
-        <h2 className="text-2xl font-semibold">Admin Analytics Dashboard</h2>
-        <p className="mt-1 text-sm text-white/80">Last refresh: {new Date(data.timestamp).toLocaleString()}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold">Admin Analytics Dashboard</h2>
+            <p className="mt-1 text-sm text-white/80">Last refresh: {new Date(data.timestamp).toLocaleString()}</p>
+          </div>
+          <button
+            className="rounded-full border border-amber-300 bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-amber-300"
+            onClick={() => setIsAnalyticsExpanded((current) => !current)}
+            type="button"
+          >
+            {isAnalyticsExpanded ? "Hide Analytics" : "View Analytics"}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <a className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50" href="#orders">
-          Orders Placed
-        </a>
+        {isAnalyticsExpanded && (
+          <a className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50" href="#orders">
+            Orders Placed
+          </a>
+        )}
         <a className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50" href="#products">
           All Products
         </a>
@@ -391,10 +449,41 @@ function AdminDashboardPage() {
         </a>
       </div>
 
+      {!isAnalyticsExpanded && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Analytics view is collapsed.</p>
+              <p className="text-xs text-slate-500">Click "View Analytics" to expand all analytics cards, filters, and orders insights.</p>
+            </div>
+            <button
+              className="rounded-full border border-amber-400 bg-amber-300 px-4 py-1.5 text-sm font-semibold text-slate-900 transition hover:bg-amber-200"
+              onClick={() => setIsAnalyticsExpanded(true)}
+              type="button"
+            >
+              Expand Analytics
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <span className="font-semibold">Products:</span> {products.length}
+            </p>
+            <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <span className="font-semibold">Orders:</span> {filteredOrders.length}
+            </p>
+            <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <span className="font-semibold">Conversion:</span> {(conversionRate * 100).toFixed(2)}%
+            </p>
+          </div>
+        </section>
+      )}
+
+      {isAnalyticsExpanded && (
+        <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Products" value={String(products.length)} />
-        <StatCard label="Orders Placed" value={String(paidOrdersCount)} />
-        <StatCard label="Total Revenue" value={`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+        <StatCard label="Orders Placed" value={String(filteredOrders.length)} />
+        <StatCard label="Total Revenue" value={`₦${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
         <StatCard label="Conversion" value={`${(conversionRate * 100).toFixed(2)}%`} />
       </div>
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -430,38 +519,118 @@ function AdminDashboardPage() {
       </div>
 
       <section id="orders" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
-        <h3 className="text-xl font-semibold">Orders Placed</h3>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold">Orders Placed</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""} total &bull;{" "}
+              {paidOrdersCount} paid &bull; Revenue ₦{totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+          <button
+            className="rounded-xl border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            disabled={refreshingOrders}
+            onClick={() => void refreshOrders()}
+            type="button"
+          >
+            {refreshingOrders ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
         {filteredOrders.length === 0 ? (
-          <p className="text-sm text-slate-600">No orders available for the selected range.</p>
+          <p className="text-sm text-slate-600">No orders for the selected range.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="text-slate-500">
                 <tr>
-                  <th className="pb-2 pr-4">Order ID</th>
-                  <th className="pb-2 pr-4">User</th>
-                  <th className="pb-2 pr-4">Status</th>
-                  <th className="pb-2 pr-4">Items</th>
-                  <th className="pb-2 pr-4">Total</th>
-                  <th className="pb-2">Placed At</th>
+                  <th className="pb-2 pr-4 font-medium">Order ID</th>
+                  <th className="pb-2 pr-4 font-medium">Customer</th>
+                  <th className="pb-2 pr-4 font-medium">Status</th>
+                  <th className="pb-2 pr-4 font-medium">Items</th>
+                  <th className="pb-2 pr-4 font-medium">Total</th>
+                  <th className="pb-2 pr-4 font-medium">Placed At</th>
+                  <th className="pb-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredOrders.map((order) => (
-                  <tr key={order.id} className="border-t border-slate-100">
-                    <td className="py-2 pr-4 font-medium">{order.id.slice(0, 8)}...</td>
-                    <td className="py-2 pr-4">{order.userId}</td>
-                    <td className="py-2 pr-4">{order.status}</td>
-                    <td className="py-2 pr-4">{order.items.length}</td>
-                    <td className="py-2 pr-4">${Number(order.totalAmount).toLocaleString()}</td>
-                    <td className="py-2">{new Date(order.createdAt).toLocaleString()}</td>
-                  </tr>
+                  <Fragment key={order.id}>
+                    <tr className="border-t border-slate-100 transition-colors hover:bg-slate-50">
+                      <td className="py-2 pr-4 font-mono text-xs text-slate-600">{order.id.slice(0, 8)}&hellip;</td>
+                      <td className="py-2 pr-4">{order.userId}</td>
+                      <td className="py-2 pr-4">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          order.status === "PAID" || order.status === "DELIVERED"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : order.status === "PAYMENT_PENDING"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : order.status === "CANCELLED"
+                                ? "bg-red-100 text-red-700"
+                                : order.status === "SHIPPED"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : order.status === "FULFILLING"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-slate-100 text-slate-700"
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4">{order.items.length} item{order.items.length !== 1 ? "s" : ""}</td>
+                      <td className="py-2 pr-4 font-medium">₦{Number(order.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="py-2 pr-4 text-slate-500">{new Date(order.createdAt).toLocaleString()}</td>
+                      <td className="py-2">
+                        <button
+                          className="rounded-lg border border-slate-200 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
+                          onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
+                          type="button"
+                        >
+                          {expandedOrderId === order.id ? "Hide" : "Details"}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedOrderId === order.id && (
+                      <tr className="bg-slate-50">
+                        <td colSpan={7} className="px-4 pb-4 pt-2">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Order Items</p>
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="text-xs text-slate-500">
+                                <th className="pb-1 pr-6 text-left font-medium">Product</th>
+                                <th className="pb-1 pr-6 text-right font-medium">Qty</th>
+                                <th className="pb-1 pr-6 text-right font-medium">Unit Price</th>
+                                <th className="pb-1 text-right font-medium">Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {order.items.map((item) => (
+                                <tr key={item.id ?? item.productId} className="border-t border-slate-200">
+                                  <td className="py-1.5 pr-6">{item.productName}</td>
+                                  <td className="py-1.5 pr-6 text-right text-slate-600">{item.quantity}</td>
+                                  <td className="py-1.5 pr-6 text-right text-slate-600">₦{Number(item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="py-1.5 text-right font-medium">₦{(Number(item.unitPrice) * item.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t-2 border-slate-300">
+                                <td colSpan={3} className="pt-2 text-right text-sm font-semibold text-slate-700">Order Total</td>
+                                <td className="pt-2 text-right text-sm font-semibold">₦{Number(order.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                          <p className="mt-2 font-mono text-xs text-slate-400">ID: {order.id}</p>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
           </div>
         )}
       </section>
+        </>
+      )}
 
       <LiveAgentInboxPanel />
 
@@ -691,10 +860,12 @@ function AdminDashboardPage() {
         </div>
       </section>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
-        <p className="text-xs uppercase tracking-[0.15em] text-slate-500">Alerts</p>
-        <p className="mt-2 text-sm text-slate-700">{data.alerts}</p>
-      </div>
+      {isAnalyticsExpanded && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+          <p className="text-xs uppercase tracking-[0.15em] text-slate-500">Alerts</p>
+          <p className="mt-2 text-sm text-slate-700">{alerts}</p>
+        </div>
+      )}
     </section>
   );
 }

@@ -5,11 +5,15 @@ import type {
   Cart,
   CreateOrderRequest,
   CustomerOrder,
+  PagedResponse,
   PaymentIntentCreateRequest,
   PaymentIntentCreateResponse,
+  PaystackInitializeRequest,
+  PaystackInitializeResponse,
   Product,
   ProductCreateRequest,
   ProductUpdateRequest,
+  RegisterResponse,
 } from "../types";
 
 const api = axios.create({
@@ -20,27 +24,70 @@ const api = axios.create({
   },
 });
 
+// On 401: clear an invalid/expired token and retry the request without auth.
+// This prevents stale tokens from breaking public endpoints like product listing.
+api.interceptors.response.use(
+  (response) => response,
+  async (error: { response?: { status?: number }; config: Record<string, unknown> }) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retried && localStorage.getItem("auth_token")) {
+      originalRequest._retried = true;
+      localStorage.removeItem("auth_token");
+      window.dispatchEvent(new Event("auth-changed"));
+      delete (originalRequest.headers as Record<string, unknown>)["Authorization"];
+      return api(originalRequest);
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const authApi = {
+  async register(payload: {
+    firstName: string;
+    lastName: string;
+    address: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+  }): Promise<RegisterResponse> {
+    const { data } = await api.post<RegisterResponse>("/api/v1/auth/register", payload);
+    return data;
+  },
+
+  async verifyOtp(email: string, otp: string): Promise<AuthResponse> {
+    const { data } = await api.post<AuthResponse>("/api/v1/auth/verify-otp", { email, otp });
+    return data;
+  },
+
+  async resendOtp(email: string): Promise<void> {
+    await api.post("/api/v1/auth/resend-otp", { email });
+  },
+
   async login(email: string, password: string): Promise<AuthResponse> {
-    const { data } = await api.post<AuthResponse>("/api/auth/login", { email, password });
+    const { data } = await api.post<AuthResponse>("/api/v1/auth/login", { email, password });
     return data;
   },
 };
 
 export const productApi = {
-  async list(token?: string): Promise<Product[]> {
-    const { data } = await api.get<Product[]>("/api/products", {
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : undefined,
+  async list(token?: string, page = 0, size = 20): Promise<PagedResponse<Product>> {
+    const { data } = await api.get<PagedResponse<Product>>("/api/v1/products", {
+      params: { page, size },
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    return data;
+  },
+
+  async search(query: string, token?: string): Promise<Product[]> {
+    const { data } = await api.get<Product[]>("/api/v1/products/search", {
+      params: { q: query },
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     return data;
   },
 
   async getById(id: number, token?: string): Promise<Product> {
-    const { data } = await api.get<Product>(`/api/products/${id}`, {
+    const { data } = await api.get<Product>(`/api/v1/products/${id}`, {
       headers: token
         ? {
             Authorization: `Bearer ${token}`,
@@ -51,7 +98,7 @@ export const productApi = {
   },
 
   async create(token: string, payload: ProductCreateRequest): Promise<Product> {
-    const { data } = await api.post<Product>("/api/products", payload, {
+    const { data } = await api.post<Product>("/api/v1/products", payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -60,7 +107,7 @@ export const productApi = {
   },
 
   async update(token: string, id: number, payload: ProductUpdateRequest): Promise<Product> {
-    const { data } = await api.put<Product>(`/api/products/${id}`, payload, {
+    const { data } = await api.put<Product>(`/api/v1/products/${id}`, payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -69,7 +116,7 @@ export const productApi = {
   },
 
   async remove(token: string, id: number): Promise<void> {
-    await api.delete(`/api/products/${id}`, {
+    await api.delete(`/api/v1/products/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -79,7 +126,7 @@ export const productApi = {
 
 export const adminApi = {
   async overview(token: string): Promise<AnalyticsOverview> {
-    const { data } = await api.get<AnalyticsOverview>("/api/admin/analytics/overview", {
+    const { data } = await api.get<AnalyticsOverview>("/api/v1/admin/analytics/overview", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -89,17 +136,16 @@ export const adminApi = {
 };
 
 export const orderApi = {
-  async listAll(token: string): Promise<CustomerOrder[]> {
-    const { data } = await api.get<CustomerOrder[]>("/api/orders", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  async listAll(token: string, page = 0, size = 25): Promise<PagedResponse<CustomerOrder>> {
+    const { data } = await api.get<PagedResponse<CustomerOrder>>("/api/v1/orders", {
+      params: { page, size },
+      headers: { Authorization: `Bearer ${token}` },
     });
     return data;
   },
 
   async create(token: string, payload: CreateOrderRequest): Promise<CustomerOrder> {
-    const { data } = await api.post<CustomerOrder>("/api/orders", payload, {
+    const { data } = await api.post<CustomerOrder>("/api/v1/orders", payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -110,10 +156,15 @@ export const orderApi = {
 
 export const paymentApi = {
   async createIntent(token: string, payload: PaymentIntentCreateRequest): Promise<PaymentIntentCreateResponse> {
-    const { data } = await api.post<PaymentIntentCreateResponse>("/api/payments/intent", payload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const { data } = await api.post<PaymentIntentCreateResponse>("/api/v1/payments/intent", payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  },
+
+  async initializePaystack(token: string, payload: PaystackInitializeRequest): Promise<PaystackInitializeResponse> {
+    const { data } = await api.post<PaystackInitializeResponse>("/api/v1/payments/paystack/initialize", payload, {
+      headers: { Authorization: `Bearer ${token}` },
     });
     return data;
   },
@@ -127,8 +178,8 @@ type AddCartItemPayload = {
 };
 
 export const cartApi = {
-  async getCart(token: string, userId: string): Promise<Cart> {
-    const { data } = await api.get<Cart>(`/api/cart/${encodeURIComponent(userId)}`, {
+  async getCart(token: string): Promise<Cart> {
+    const { data } = await api.get<Cart>(`/api/v1/cart`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -136,8 +187,8 @@ export const cartApi = {
     return data;
   },
 
-  async addItem(token: string, userId: string, payload: AddCartItemPayload): Promise<Cart> {
-    const { data } = await api.post<Cart>(`/api/cart/${encodeURIComponent(userId)}/items`, payload, {
+  async addItem(token: string, payload: AddCartItemPayload): Promise<Cart> {
+    const { data } = await api.post<Cart>(`/api/v1/cart/items`, payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -145,8 +196,8 @@ export const cartApi = {
     return data;
   },
 
-  async removeItem(token: string, userId: string, productId: number): Promise<Cart> {
-    const { data } = await api.delete<Cart>(`/api/cart/${encodeURIComponent(userId)}/items/${productId}`, {
+  async removeItem(token: string, productId: number): Promise<Cart> {
+    const { data } = await api.delete<Cart>(`/api/v1/cart/items/${productId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -154,8 +205,8 @@ export const cartApi = {
     return data;
   },
 
-  async clear(token: string, userId: string): Promise<void> {
-    await api.delete(`/api/cart/${encodeURIComponent(userId)}`, {
+  async clear(token: string): Promise<void> {
+    await api.delete(`/api/v1/cart`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

@@ -45,10 +45,10 @@ const footerColumns: FooterColumn[] = [
   {
     title: "Support & Contact",
     links: [
-      { label: "Contact", to: "/contact", bold: true },
-      { label: "Virtual Agent", to: "/contact" },
-      { label: "Live Agent", to: "/contact" },
-      { label: "Send Message", to: "/contact" },
+      { label: "Contact", to: "/contact#support-panel", bold: true },
+      { label: "Virtual Agent", to: "/contact?channel=virtual#support-panel" },
+      { label: "Live Agent", to: "/contact?channel=live#support-panel" },
+      { label: "Send Message", to: "/contact?channel=message#support-panel" },
       { label: "Safety & Policy", to: "/contact" },
     ],
   },

@@ -5,7 +5,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
@@ -21,8 +20,21 @@ public class JwtService {
 
     private final SecretKey key;
 
-    public JwtService(@Value("${security.jwt.secret:${JWT_SECRET:replace-with-32-byte-minimum-secret-key}}") String secret) {
-        this.key = Keys.hmacShaKeyFor(normalize(secret));
+    public JwtService(@Value("${security.jwt.secret}") String secret) {
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(secret);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(
+                "JWT secret must be a valid Base64-encoded string. " +
+                "Generate one with: python -c \"import secrets, base64; print(base64.b64encode(secrets.token_bytes(32)).decode())\"", e);
+        }
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                "JWT secret is too short (" + keyBytes.length + " bytes decoded). " +
+                "Must be at least 256 bits (32 bytes) when Base64-decoded.");
+        }
+        this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String extractUsername(String token) {
@@ -51,11 +63,4 @@ public class JwtService {
         return username.equals(userDetails.getUsername()) && expiration.after(new Date());
     }
 
-    private byte[] normalize(String secret) {
-        try {
-            return Decoders.BASE64.decode(secret);
-        } catch (RuntimeException ignored) {
-            return secret.getBytes(StandardCharsets.UTF_8);
-        }
-    }
 }

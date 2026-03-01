@@ -51,6 +51,7 @@ export type LiveAgentChatMessage = {
   id: string;
   sessionId: string;
   author: LiveChatAuthor;
+  senderName?: string;
   text: string;
   createdAt: string;
 };

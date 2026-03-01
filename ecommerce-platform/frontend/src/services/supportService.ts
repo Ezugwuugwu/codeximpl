@@ -1,3 +1,4 @@
+import axios from "axios";
 import type {
   ContactMessageReceipt,
   ContactMessageRequest,
@@ -6,153 +7,91 @@ import type {
   LiveAgentSession,
   LiveAgentTicket,
   LiveChatEndedBy,
-  LiveChatStatus,
   VirtualChatMessage,
 } from "../types/support";
 
-type SupportStore = {
-  tickets: LiveAgentTicket[];
-  liveSessions: LiveAgentSession[];
-  liveMessages: LiveAgentChatMessage[];
-  messages: Array<ContactMessageReceipt & ContactMessageRequest>;
+// ---- Auth helper ----
+
+const authHeaders = () => {
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const supportStoreKey = "okanga_support_center_v1";
-const LIVE_CHAT_IDLE_MINUTES = 5;
-const emptyStore = (): SupportStore => ({ tickets: [], liveSessions: [], liveMessages: [], messages: [] });
-const nowIso = () => new Date().toISOString();
+// ---- Virtual agent (client-side, no backend) ----
 
-const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? value as T[] : []);
-
-const normalizeStore = (parsed: unknown): SupportStore => {
-  if (!parsed || typeof parsed !== "object") {
-    return emptyStore();
-  }
-  const store = parsed as Partial<SupportStore>;
-  return {
-    tickets: asArray<LiveAgentTicket>(store.tickets),
-    liveSessions: asArray<LiveAgentSession>(store.liveSessions),
-    liveMessages: asArray<LiveAgentChatMessage>(store.liveMessages),
-    messages: asArray<ContactMessageReceipt & ContactMessageRequest>(store.messages),
-  };
-};
-
-const readStore = (): SupportStore => {
-  try {
-    const raw = localStorage.getItem(supportStoreKey);
-    if (!raw) {
-      return emptyStore();
-    }
-    return normalizeStore(JSON.parse(raw));
-  } catch {
-    return emptyStore();
-  }
-};
-
-const writeStore = (store: SupportStore) => {
-  localStorage.setItem(supportStoreKey, JSON.stringify(store));
-};
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const createReference = (prefix: "AGT" | "MSG" | "SES" | "LIV") => {
-  const seed = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
-  return `${prefix}-${seed.slice(-10).toUpperCase()}`;
-};
-
-const emitSupportUpdate = () => {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("support:store-updated"));
-  }
-};
-
-const isLiveSessionOpen = (status: LiveChatStatus) => status === "QUEUED" || status === "IN_PROGRESS";
-
-const getLiveQueue = (issue: string) => (/payment|charge|refund/i.test(issue) ? "Billing Queue" : "General Support Queue");
-
-const sortSessionsByActivity = (sessions: LiveAgentSession[]) =>
-  [...sessions].sort((a, b) => Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt));
-
-const addLiveMessage = (
-  store: SupportStore,
-  sessionId: string,
-  author: LiveAgentChatMessage["author"],
-  text: string
-) => {
-  const trimmed = text.trim();
-  if (!trimmed) {
-    return;
-  }
-  store.liveMessages.push({
-    id: createReference("LIV"),
-    sessionId,
-    author,
-    text: trimmed,
-    createdAt: nowIso(),
-  });
-};
-
-const updateLiveSession = (
-  store: SupportStore,
-  sessionId: string,
-  updater: (session: LiveAgentSession) => LiveAgentSession
-) => {
-  const index = store.liveSessions.findIndex((session) => session.sessionId === sessionId);
-  if (index < 0) {
-    return null;
-  }
-  const updated = updater(store.liveSessions[index]);
-  store.liveSessions[index] = updated;
-  return updated;
-};
-
-const closeIdleLiveSessions = (store: SupportStore, idleMinutes: number) => {
-  const cutoff = Date.now() - idleMinutes * 60_000;
-  const timedOut: string[] = [];
-  store.liveSessions = store.liveSessions.map((session) => {
-    if (!isLiveSessionOpen(session.status)) {
-      return session;
-    }
-    const lastActivity = Date.parse(session.lastActivityAt);
-    if (!Number.isFinite(lastActivity) || lastActivity >= cutoff) {
-      return session;
-    }
-    timedOut.push(session.sessionId);
-    const closedAt = nowIso();
-    return { ...session, status: "TIMED_OUT", endedAt: closedAt, endedBy: "system", lastActivityAt: closedAt };
-  });
-  timedOut.forEach((sessionId) => addLiveMessage(store, sessionId, "system", "Chat ended automatically due to inactivity."));
-  return timedOut.length;
-};
-
-const ensureLiveSessionState = (store: SupportStore) => {
-  const closedCount = closeIdleLiveSessions(store, LIVE_CHAT_IDLE_MINUTES);
-  if (closedCount > 0) {
-    writeStore(store);
-    emitSupportUpdate();
-  }
-};
-
-const getVirtualReply = (input: string) => {
+const getVirtualReply = (input: string): string => {
   const text = input.toLowerCase();
-  if (/refund|return|money back/.test(text)) {
+  if (/refund|return|money back/.test(text))
     return "For refunds/returns, open your order from Cart > history and choose Return Request. I can also connect you to a live agent.";
-  }
-  if (/track|where.*order|delivery status/.test(text)) {
+  if (/track|where.*order|delivery status/.test(text))
     return "To track an order, go to Admin > Orders Placed (or your order history), then check latest status updates there.";
-  }
-  if (/payment|charged|card/.test(text)) {
+  if (/payment|charged|card/.test(text))
     return "For payment issues, verify card details and retry once. If still failing, I can escalate this to a live payment support agent.";
-  }
-  if (/live|human|agent/.test(text)) {
+  if (/live|human|agent/.test(text))
     return "You can switch to the Live Agent tab now and raise a ticket. We will queue you immediately.";
-  }
   return "I can help with order tracking, refunds, payment issues, deliveries, and product questions. Tell me what happened.";
 };
 
+// ---- Admin read-state (client-side localStorage) ----
+
+const adminReadStateKey = "okanga_admin_read_state_v1";
+
+const readAdminReadState = (): Record<string, string> => {
+  try {
+    const raw = localStorage.getItem(adminReadStateKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeAdminReadState = (state: Record<string, string>) => {
+  localStorage.setItem(adminReadStateKey, JSON.stringify(state));
+};
+
+// ---- Contact message store (client-side localStorage) ----
+
+type ContactStore = {
+  messages: Array<ContactMessageReceipt & ContactMessageRequest>;
+};
+const contactStoreKey = "okanga_contact_messages_v1";
+const nowIso = () => new Date().toISOString();
+const supportBroadcastChannelName = "okanga_support";
+const isOpenLiveStatus = (status?: LiveAgentSession["status"]) => status === "QUEUED" || status === "IN_PROGRESS";
+
+const readContactStore = (): ContactStore => {
+  try {
+    const raw = localStorage.getItem(contactStoreKey);
+    return raw ? (JSON.parse(raw) as ContactStore) : { messages: [] };
+  } catch {
+    return { messages: [] };
+  }
+};
+
+const createMsgRef = () => {
+  const seed = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+  return `MSG-${seed.slice(-10).toUpperCase()}`;
+};
+
+const emitSupportStoreUpdated = () => {
+  window.dispatchEvent(new Event("support:store-updated"));
+  if (typeof BroadcastChannel !== "undefined") {
+    const channel = new BroadcastChannel(supportBroadcastChannelName);
+    channel.postMessage({ type: "store-updated", at: nowIso() });
+    channel.close();
+  }
+};
+
+// ---- API base ----
+
+const API = "/api/v1/support/sessions";
+
+// ---- Service ----
+
 export const supportService = {
+  // Virtual agent reply (no server call)
   async sendVirtualMessage(input: string): Promise<VirtualChatMessage> {
-    await delay(300);
+    await new Promise((r) => setTimeout(r, 300));
     return {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       author: "agent",
@@ -161,159 +100,195 @@ export const supportService = {
     };
   },
 
+  // Create a new live-agent session
   async requestLiveAgent(payload: LiveAgentRequest): Promise<LiveAgentTicket> {
-    await delay(450);
-    const queue = getLiveQueue(payload.issue);
-    const createdAt = nowIso();
-    const sessionId = createReference("SES");
-    const ticketId = createReference("AGT");
-    const ticket: LiveAgentTicket = {
-      sessionId,
-      ticketId,
+    const { data } = await axios.post<LiveAgentSession>(
+      API,
+      {
+        name: payload.name,
+        email: payload.email,
+        issue: payload.issue,
+        orderId: payload.orderId || null,
+        preferredContact: payload.preferredContact,
+      },
+      { headers: authHeaders() }
+    );
+    emitSupportStoreUpdated();
+    return {
+      sessionId: data.sessionId,
+      ticketId: data.ticketId,
       status: "QUEUED",
-      estimatedWaitMinutes: 4 + Math.floor(Math.random() * 8),
-      assignedQueue: queue,
-      createdAt,
+      estimatedWaitMinutes: data.estimatedWaitMinutes,
+      assignedQueue: data.assignedQueue,
+      createdAt: data.createdAt,
     };
-    const session: LiveAgentSession = {
-      sessionId,
-      ticketId,
-      name: payload.name.trim(),
-      email: payload.email.trim(),
-      orderId: payload.orderId?.trim() || undefined,
-      preferredContact: payload.preferredContact,
-      assignedQueue: queue,
-      status: "QUEUED",
-      estimatedWaitMinutes: ticket.estimatedWaitMinutes,
-      createdAt,
-      lastActivityAt: createdAt,
-    };
-    const store = readStore();
-    ensureLiveSessionState(store);
-    store.tickets.unshift(ticket);
-    store.liveSessions.unshift(session);
-    addLiveMessage(store, sessionId, "customer", payload.issue);
-    addLiveMessage(store, sessionId, "system", "Live agent request received. An agent will join shortly.");
-    writeStore(store);
-    emitSupportUpdate();
-    return ticket;
   },
 
-  listLiveSessions(): LiveAgentSession[] {
-    const store = readStore();
-    ensureLiveSessionState(store);
-    return sortSessionsByActivity(store.liveSessions);
-  },
-
-  getLiveSession(sessionId: string): LiveAgentSession | null {
-    const store = readStore();
-    ensureLiveSessionState(store);
-    return store.liveSessions.find((session) => session.sessionId === sessionId) || null;
-  },
-
-  listLiveMessages(sessionId: string): LiveAgentChatMessage[] {
-    const store = readStore();
-    ensureLiveSessionState(store);
-    return store.liveMessages
-      .filter((message) => message.sessionId === sessionId)
-      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
-  },
-
-  sendCustomerLiveMessage(sessionId: string, text: string): boolean {
-    const store = readStore();
-    ensureLiveSessionState(store);
-    const updated = updateLiveSession(store, sessionId, (session) => {
-      return isLiveSessionOpen(session.status) ? { ...session, lastActivityAt: nowIso() } : session;
+  // List all sessions — server auto-closes idle ones
+  async listLiveSessions(): Promise<LiveAgentSession[]> {
+    const { data } = await axios.get<LiveAgentSession[]>(API, {
+      headers: authHeaders(),
     });
-    if (!updated || !isLiveSessionOpen(updated.status)) {
+    return data;
+  },
+
+  // Get one session (customer polling)
+  async getLiveSession(sessionId: string): Promise<LiveAgentSession | null> {
+    try {
+      const { data } = await axios.get<LiveAgentSession>(`${API}/${sessionId}`, {
+        headers: authHeaders(),
+      });
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  // Messages for a session
+  async listLiveMessages(sessionId: string): Promise<LiveAgentChatMessage[]> {
+    const { data } = await axios.get<LiveAgentChatMessage[]>(`${API}/${sessionId}/messages`, {
+      headers: authHeaders(),
+    });
+    return data;
+  },
+
+  // Customer sends a message
+  async sendCustomerLiveMessage(sessionId: string, text: string): Promise<boolean> {
+    try {
+      await axios.post(
+        `${API}/${sessionId}/messages`,
+        { author: "customer", text },
+        { headers: authHeaders() }
+      );
+      emitSupportStoreUpdated();
+      return true;
+    } catch {
       return false;
     }
-    addLiveMessage(store, sessionId, "customer", text);
-    writeStore(store);
-    emitSupportUpdate();
-    return true;
   },
 
-  joinLiveSession(sessionId: string, agentName: string): boolean {
-    const store = readStore();
-    ensureLiveSessionState(store);
-    const previous = store.liveSessions.find((session) => session.sessionId === sessionId);
-    const updated = updateLiveSession(store, sessionId, (session) => {
-      if (!isLiveSessionOpen(session.status)) {
-        return session;
+  // Agent joins a queued session
+  async joinLiveSession(sessionId: string, agentName: string): Promise<boolean> {
+    try {
+      await axios.post(
+        `${API}/${sessionId}/join`,
+        { agentName },
+        { headers: authHeaders() }
+      );
+      emitSupportStoreUpdated();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  // Agent sends a reply
+  async sendAgentLiveMessage(sessionId: string, text: string, agentName: string): Promise<boolean> {
+    try {
+      await axios.post(
+        `${API}/${sessionId}/messages`,
+        { author: "agent", text, senderName: agentName },
+        { headers: authHeaders() }
+      );
+      emitSupportStoreUpdated();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  // End a session
+  async endLiveSession(sessionId: string, endedBy: LiveChatEndedBy, note?: string): Promise<boolean> {
+    try {
+      await axios.post(
+        `${API}/${sessionId}/end`,
+        { endedBy, reason: note || "Chat ended." },
+        { headers: authHeaders() }
+      );
+      emitSupportStoreUpdated();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  // Clear all sessions (admin)
+  async clearAllLiveSessions(): Promise<void> {
+    await axios.delete(API, { headers: authHeaders() });
+    emitSupportStoreUpdated();
+  },
+
+  // No-op: server handles idle-close on every listLiveSessions call
+  async autoCloseIdleSessions(): Promise<void> {
+    // handled server-side
+  },
+
+  // Unread count: compares session lastActivityAt vs admin read timestamps
+  getUnreadSessionCount(sessions: LiveAgentSession[]): number {
+    const readState = readAdminReadState();
+    let count = 0;
+    for (const session of sessions) {
+      if (session.status !== "QUEUED" && session.status !== "IN_PROGRESS") continue;
+      const lastReadAt = readState[session.sessionId];
+      if (!lastReadAt || Date.parse(session.lastActivityAt) > Date.parse(lastReadAt)) {
+        count++;
       }
-      const status = session.status === "QUEUED" ? "IN_PROGRESS" : session.status;
-      return { ...session, status, assignedAgentName: agentName.trim() || "Support Agent", lastActivityAt: nowIso() };
-    });
-    if (!updated || !isLiveSessionOpen(updated.status)) {
-      return false;
     }
-    if (previous?.status === "QUEUED" && updated.status === "IN_PROGRESS") {
-      addLiveMessage(store, sessionId, "system", `${updated.assignedAgentName} joined the chat.`);
-    }
-    writeStore(store);
-    emitSupportUpdate();
-    return true;
+    return count;
   },
 
-  sendAgentLiveMessage(sessionId: string, text: string, agentName: string): boolean {
-    const store = readStore();
-    ensureLiveSessionState(store);
-    const updated = updateLiveSession(store, sessionId, (session) => {
-      return isLiveSessionOpen(session.status)
-        ? { ...session, status: "IN_PROGRESS", assignedAgentName: agentName.trim() || "Support Agent", lastActivityAt: nowIso() }
-        : session;
-    });
-    if (!updated || !isLiveSessionOpen(updated.status)) {
-      return false;
-    }
-    addLiveMessage(store, sessionId, "agent", text);
-    writeStore(store);
-    emitSupportUpdate();
-    return true;
+  markSessionRead(sessionId: string): void {
+    const state = readAdminReadState();
+    state[sessionId] = nowIso();
+    writeAdminReadState(state);
   },
 
-  endLiveSession(sessionId: string, endedBy: LiveChatEndedBy, note?: string): boolean {
-    const store = readStore();
-    ensureLiveSessionState(store);
-    const session = store.liveSessions.find((entry) => entry.sessionId === sessionId);
-    if (!session || !isLiveSessionOpen(session.status)) {
-      return false;
-    }
-    const updated = updateLiveSession(store, sessionId, (session) => {
-      const closedAt = nowIso();
-      return { ...session, status: "ENDED", endedAt: closedAt, endedBy, lastActivityAt: closedAt };
-    });
-    if (!updated) {
-      return false;
-    }
-    addLiveMessage(store, sessionId, "system", note || `Chat ended by ${endedBy}.`);
-    writeStore(store);
-    emitSupportUpdate();
-    return true;
+  listContactMessages(): Array<ContactMessageReceipt & ContactMessageRequest> {
+    return readContactStore().messages;
   },
 
-  autoCloseIdleSessions(idleMinutes = LIVE_CHAT_IDLE_MINUTES): number {
-    const store = readStore();
-    const closedCount = closeIdleLiveSessions(store, idleMinutes);
-    if (closedCount > 0) {
-      writeStore(store);
-      emitSupportUpdate();
-    }
-    return closedCount;
+  getSupportNotificationCount(params: {
+    sessions?: LiveAgentSession[];
+    isAdmin: boolean;
+    userEmail?: string | null;
+  }): number {
+    const normalizedEmail = params.userEmail?.trim().toLowerCase() || "";
+    const sessions = params.sessions ?? [];
+    const liveCount = sessions.filter((session) => {
+      if (!isOpenLiveStatus(session.status)) {
+        return false;
+      }
+      if (params.isAdmin) {
+        return true;
+      }
+      if (!normalizedEmail) {
+        return false;
+      }
+      return (session.email || "").trim().toLowerCase() === normalizedEmail;
+    }).length;
+
+    const messages = readContactStore().messages;
+    const messageCount = params.isAdmin
+      ? messages.length
+      : normalizedEmail
+        ? messages.filter((message) => (message.email || "").trim().toLowerCase() === normalizedEmail).length
+        : messages.length;
+
+    return liveCount + messageCount;
   },
 
+  // Contact/message form (client-side only)
   async submitMessage(payload: ContactMessageRequest): Promise<ContactMessageReceipt> {
-    await delay(350);
+    await new Promise((r) => setTimeout(r, 350));
     const receipt: ContactMessageReceipt = {
-      reference: createReference("MSG"),
+      reference: createMsgRef(),
       status: "RECEIVED",
       createdAt: nowIso(),
     };
-    const store = readStore();
+    const store = readContactStore();
     store.messages.unshift({ ...payload, ...receipt });
-    writeStore(store);
-    emitSupportUpdate();
+    localStorage.setItem(contactStoreKey, JSON.stringify(store));
+    emitSupportStoreUpdated();
     return receipt;
   },
 };

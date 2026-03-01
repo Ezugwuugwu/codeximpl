@@ -6,6 +6,9 @@ import com.ecommerce.product.service.dto.InventoryUpdateRequest;
 import com.ecommerce.product.service.dto.ProductRequest;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,8 +34,11 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Product>> list() {
-        return ResponseEntity.ok(service.listActiveProducts());
+    public ResponseEntity<Page<Product>> list(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        var pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("updatedAt").descending());
+        return ResponseEntity.ok(service.listActiveProducts(pageable));
     }
 
     @GetMapping("/{id}")

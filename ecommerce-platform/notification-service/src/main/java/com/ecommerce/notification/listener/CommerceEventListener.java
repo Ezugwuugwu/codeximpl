@@ -17,7 +17,8 @@ public class CommerceEventListener {
 
     @RabbitListener(queues = "order.events")
     public void onOrderEvent(Map<String, Object> payload) {
-        String recipient = payload.getOrDefault("userId", "customer").toString() + "@example.com";
+        String recipient = payload.getOrDefault("userId", "").toString();
+        if (recipient.isBlank()) return;
         String orderId = payload.getOrDefault("orderId", "N/A").toString();
         String status = payload.getOrDefault("status", "UNKNOWN").toString();
 
@@ -29,7 +30,8 @@ public class CommerceEventListener {
 
     @RabbitListener(queues = "payment.events")
     public void onPaymentEvent(Map<String, Object> payload) {
-        String recipient = payload.getOrDefault("userId", "customer").toString() + "@example.com";
+        String recipient = payload.getOrDefault("userId", "").toString();
+        if (recipient.isBlank()) return;
         String orderId = payload.getOrDefault("orderId", "N/A").toString();
         String status = payload.getOrDefault("status", "UNKNOWN").toString();
 

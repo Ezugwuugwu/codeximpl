@@ -4,6 +4,9 @@ import com.ecommerce.user.service.AuthService;
 import com.ecommerce.user.service.dto.AuthResponse;
 import com.ecommerce.user.service.dto.LoginRequest;
 import com.ecommerce.user.service.dto.RegisterRequest;
+import com.ecommerce.user.service.dto.RegisterResponse;
+import com.ecommerce.user.service.dto.ResendOtpRequest;
+import com.ecommerce.user.service.dto.VerifyOtpRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,8 +26,19 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        return ResponseEntity.ok(authService.verifyOtp(request.email(), request.otp()));
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<Void> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
+        authService.resendOtp(request.email());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/login")

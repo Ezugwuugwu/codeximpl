@@ -5,10 +5,13 @@
 # Node
 frontend/node_modules/
 frontend/dist/
+frontend/tsconfig.tsbuildinfo
 
 # Env
 .env
 *.log
+pgadmin/pgpassfile
+pgadmin/servers.json
 
 # IDE
 .idea/

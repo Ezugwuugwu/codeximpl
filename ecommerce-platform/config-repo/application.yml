@@ -1,3 +1,20 @@
+spring:
+  main:
+    # Create beans on first use instead of at startup — cuts boot time by ~30%.
+    lazy-initialization: true
+
+eureka:
+  instance:
+    # Re-register heartbeat every 5s (default 30s) so the server sees the
+    # service as UP faster and expires stale instances sooner.
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    # Re-fetch the full registry every 5s instead of 30s so the gateway's
+    # load balancer discovers new services within ~10s of startup.
+    registry-fetch-interval-seconds: 5
+    instance-info-replication-interval-seconds: 5
+
 management:
   tracing:
     sampling:

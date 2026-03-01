@@ -70,6 +70,15 @@
           <version>3.15.0</version>
           <configuration>
             <release>${java.version}</release>
+            <parameters>true</parameters>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <!-- Required for Mockito inline mocking on Java 21+ (byte-buddy agent) -->
+            <argLine>-XX:+EnableDynamicAgentLoading --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
           </configuration>
         </plugin>
       </plugins>

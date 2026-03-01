@@ -5,6 +5,8 @@ import com.ecommerce.cart.service.CartManagementService;
 import com.ecommerce.cart.service.dto.AddCartItemRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,25 +25,26 @@ public class CartController {
         this.service = service;
     }
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<Cart> getCart(@PathVariable("userId") String userId) {
-        return ResponseEntity.ok(service.getCart(userId));
+    @GetMapping
+    public ResponseEntity<Cart> getCart(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(service.getCart(jwt.getSubject()));
     }
 
-    @PostMapping("/{userId}/items")
-    public ResponseEntity<Cart> addItem(@PathVariable("userId") String userId,
+    @PostMapping("/items")
+    public ResponseEntity<Cart> addItem(@AuthenticationPrincipal Jwt jwt,
                                         @Valid @RequestBody AddCartItemRequest request) {
-        return ResponseEntity.ok(service.addItem(userId, request));
+        return ResponseEntity.ok(service.addItem(jwt.getSubject(), request));
     }
 
-    @DeleteMapping("/{userId}/items/{productId}")
-    public ResponseEntity<Cart> removeItem(@PathVariable("userId") String userId, @PathVariable("productId") Long productId) {
-        return ResponseEntity.ok(service.removeItem(userId, productId));
+    @DeleteMapping("/items/{productId}")
+    public ResponseEntity<Cart> removeItem(@AuthenticationPrincipal Jwt jwt,
+                                           @PathVariable("productId") Long productId) {
+        return ResponseEntity.ok(service.removeItem(jwt.getSubject(), productId));
     }
 
-    @DeleteMapping("/{userId}")
-    public ResponseEntity<Void> clear(@PathVariable("userId") String userId) {
-        service.clearCart(userId);
+    @DeleteMapping
+    public ResponseEntity<Void> clear(@AuthenticationPrincipal Jwt jwt) {
+        service.clearCart(jwt.getSubject());
         return ResponseEntity.noContent().build();
     }
 }
