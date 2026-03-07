@@ -36,6 +36,7 @@ const footerColumns: FooterColumn[] = [
     title: "Customer Account",
     links: [
       { label: "Sign In", to: "/login" },
+      { label: "Create Account", to: "/register" },
       { label: "Your Cart", to: "/cart" },
       { label: "Track Orders", to: "/admin" },
       { label: "Returns & Refunds", to: "/contact" },

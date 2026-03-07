@@ -10,6 +10,7 @@ import com.ecommerce.user.service.dto.RegisterRequest;
 import com.ecommerce.user.service.dto.RegisterResponse;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -42,12 +43,27 @@ public class AuthService {
         if (!request.password().equals(request.confirmPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Passwords do not match");
         }
-        if (repository.existsByEmail(request.email().toLowerCase())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
+
+        String email = request.email().toLowerCase();
+        Optional<AppUser> existing = repository.findByEmail(email);
+
+        if (existing.isPresent()) {
+            AppUser existingUser = existing.get();
+            if (existingUser.isEnabled()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
+            }
+            // Unverified account — update details and resend OTP
+            existingUser.setPassword(passwordEncoder.encode(request.password()));
+            existingUser.setFirstName(request.firstName().trim());
+            existingUser.setLastName(request.lastName().trim());
+            existingUser.setAddress(request.address().trim());
+            repository.save(existingUser);
+            otpService.generateAndSend(email);
+            return new RegisterResponse("A verification code has been sent to your email.", email);
         }
 
         AppUser user = new AppUser();
-        user.setEmail(request.email().toLowerCase());
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName().trim());
@@ -56,9 +72,9 @@ public class AuthService {
         user.setEnabled(false);
         repository.save(user);
 
-        otpService.generateAndSend(user.getEmail());
+        otpService.generateAndSend(email);
 
-        return new RegisterResponse("A verification code has been sent to your email.", user.getEmail());
+        return new RegisterResponse("A verification code has been sent to your email.", email);
     }
 
     public AuthResponse verifyOtp(String email, String otp) {

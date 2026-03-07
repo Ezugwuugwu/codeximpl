@@ -1,0 +1,20 @@
+# Claude Code memory/config — never commit
+.claude/
+
+# Environment secrets — never commit
+.env
+*.env.local
+
+# Java build output
+**/target/
+*.class
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

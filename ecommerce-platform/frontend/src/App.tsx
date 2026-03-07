@@ -165,6 +165,10 @@ function App() {
   }, [isAdmin, userEmail]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  useEffect(() => {
     setIsAccountPanelOpen(false);
   }, [location.pathname, location.search]);
 
@@ -179,9 +183,53 @@ function App() {
       <div className="mx-auto w-full max-w-[1520px] px-4 pb-10 pt-8 sm:px-6 xl:px-8">
         <header className="mb-8 overflow-hidden rounded-3xl border border-[#122033] shadow-2xl">
           <div className="flex flex-col gap-3 bg-gradient-to-r from-[#111827] via-[#13233a] to-[#17283f] p-3 md:flex-row md:items-center md:gap-4">
-            <Link className="shrink-0 px-1 text-3xl font-bold tracking-tight text-white" to="/">
-              Okanga
-            </Link>
+            <div className="flex items-center justify-between md:contents">
+              <Link className="shrink-0 px-1 text-3xl font-bold tracking-tight text-white" to="/">
+                Okanga
+              </Link>
+
+              <nav className="flex items-center gap-2 text-sm font-medium md:order-last">
+                <Link to="/" className="rounded-full bg-ink px-4 py-2 text-white transition hover:opacity-85">Store</Link>
+
+                <button
+                  aria-expanded={isAccountPanelOpen}
+                  aria-label="Open account panel"
+                  className="relative inline-flex items-center gap-1 rounded-full border border-slate-400/70 bg-white/95 px-2.5 py-1.5 text-slate-800 transition hover:bg-white"
+                  onClick={() => setIsAccountPanelOpen((prev) => !prev)}
+                  type="button"
+                >
+                  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 20c1.5-3.7 4.5-5.5 8-5.5s6.5 1.8 8 5.5" />
+                  </svg>
+                  <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                  {supportNotificationCount > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {supportNotificationCount > 99 ? "99+" : supportNotificationCount}
+                    </span>
+                  )}
+                </button>
+
+                <Link
+                  to="/cart"
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-400/70 bg-white/95 text-slate-900 transition hover:bg-white"
+                >
+                  <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.1" viewBox="0 0 24 24">
+                    <circle cx="9" cy="20" r="1.5" />
+                    <circle cx="18" cy="20" r="1.5" />
+                    <path d="M2 3h2.7c.4 0 .8.3.9.7l2.2 11c.1.4.5.7.9.7h9.8c.4 0 .8-.3.9-.7l1.7-7.4a1 1 0 0 0-1-.9H7.2" />
+                  </svg>
+                  <span className="sr-only">Cart</span>
+                  {cartCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f5c955] px-1 text-[10px] font-bold text-slate-900">
+                      {cartCount > 99 ? "99+" : cartCount}
+                    </span>
+                  )}
+                </Link>
+              </nav>
+            </div>
 
             <div className="w-full flex-1">
               <div className="flex items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md">
@@ -205,47 +253,6 @@ function App() {
               </div>
             </div>
 
-            <nav className="flex items-center justify-end gap-2 text-sm font-medium">
-              <Link to="/" className="rounded-full bg-ink px-4 py-2 text-white transition hover:opacity-85">Store</Link>
-
-              <button
-                aria-expanded={isAccountPanelOpen}
-                aria-label="Open account panel"
-                className="relative inline-flex items-center gap-1 rounded-full border border-slate-400/70 bg-white/95 px-2.5 py-1.5 text-slate-800 transition hover:bg-white"
-                onClick={() => setIsAccountPanelOpen((prev) => !prev)}
-                type="button"
-              >
-                <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 20c1.5-3.7 4.5-5.5 8-5.5s6.5 1.8 8 5.5" />
-                </svg>
-                <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-                {supportNotificationCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                    {supportNotificationCount > 99 ? "99+" : supportNotificationCount}
-                  </span>
-                )}
-              </button>
-
-              <Link
-                to="/cart"
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-400/70 bg-white/95 text-slate-900 transition hover:bg-white"
-              >
-                <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.1" viewBox="0 0 24 24">
-                  <circle cx="9" cy="20" r="1.5" />
-                  <circle cx="18" cy="20" r="1.5" />
-                  <path d="M2 3h2.7c.4 0 .8.3.9.7l2.2 11c.1.4.5.7.9.7h9.8c.4 0 .8-.3.9-.7l1.7-7.4a1 1 0 0 0-1-.9H7.2" />
-                </svg>
-                <span className="sr-only">Cart</span>
-                {cartCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f5c955] px-1 text-[10px] font-bold text-slate-900">
-                    {cartCount > 99 ? "99+" : cartCount}
-                  </span>
-                )}
-              </Link>
-            </nav>
           </div>
 
           {normalizedCategories.length > 0 && (
