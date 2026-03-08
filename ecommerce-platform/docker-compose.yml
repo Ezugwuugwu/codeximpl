@@ -183,6 +183,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_AUTH: ${SMTP_AUTH:-false}
       SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-support@okangamart.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Okanga Mart}
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       postgres-user:
@@ -350,6 +352,8 @@ services:
       SPRING_RABBITMQ_HOST: rabbitmq
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-support@okangamart.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Okanga Mart}
       ZIPKIN_URL: http://zipkin:9411/api/v2/spans
     depends_on:
       rabbitmq:

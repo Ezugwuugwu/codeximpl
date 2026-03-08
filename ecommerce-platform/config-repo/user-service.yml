@@ -36,3 +36,8 @@ spring:
           auth: ${SMTP_AUTH:false}
           starttls:
             enable: ${SMTP_STARTTLS:false}
+
+app:
+  mail:
+    from-address: ${MAIL_FROM_ADDRESS:${SMTP_USERNAME:support@okangamart.com}}
+    from-name: ${MAIL_FROM_NAME:Okanga Mart}
