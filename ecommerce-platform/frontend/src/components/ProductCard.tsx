@@ -47,6 +47,8 @@ function ProductCard({ product, onAddToCart }: Props) {
         <img
           alt={product.name}
           className="h-48 w-full bg-slate-100 object-contain transition duration-300 group-hover:scale-[1.03]"
+          decoding="async"
+          loading="lazy"
           src={previewImage}
         />
       </Link>

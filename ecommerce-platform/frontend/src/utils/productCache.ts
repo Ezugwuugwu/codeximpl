@@ -1,6 +1,6 @@
 import type { Product } from "../types";
 
-const CATALOG_CACHE_KEY = "okanga-catalog-cache-v1";
+const CATALOG_CACHE_KEY = "okanga-catalog-cache-v2";
 const PRODUCT_CACHE_KEY = "okanga-product-cache-v1";
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -8,6 +8,7 @@ type CatalogCache = {
   products: Product[];
   currentPage: number;
   hasMore: boolean;
+  pageSize: number;
   savedAt: number;
 };
 

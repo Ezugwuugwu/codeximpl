@@ -85,11 +85,6 @@ const inlinePromoThemes: PromoTheme[] = [
   },
 ];
 
-const categoryAnchor = (name: string) => {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  return `category-${slug || "uncategorized"}`;
-};
-
 const getProductGridColumns = (width: number) => {
   if (width >= 1536) {
     return 4;
@@ -101,6 +96,19 @@ const getProductGridColumns = (width: number) => {
     return 2;
   }
   return 1;
+};
+
+const getCatalogPageSize = () => {
+  if (typeof window === "undefined") {
+    return 20;
+  }
+  if (window.innerWidth < 640) {
+    return 8;
+  }
+  if (window.innerWidth < 1024) {
+    return 12;
+  }
+  return 20;
 };
 
 const createSeededRandom = (seed: number) => {
@@ -150,7 +158,11 @@ const matchesSearch = (product: Product, query: string) => {
 };
 
 function StorePage() {
-  const [cachedCatalog] = useState(() => readCatalogCache());
+  const [catalogPageSize] = useState(() => getCatalogPageSize());
+  const [cachedCatalog] = useState(() => {
+    const cache = readCatalogCache();
+    return cache?.pageSize === catalogPageSize ? cache : null;
+  });
   const [searchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>(() => cachedCatalog?.products ?? []);
   const [loading, setLoading] = useState(() => cachedCatalog === null);
@@ -169,6 +181,16 @@ function StorePage() {
   const selectedCategory = searchParams.get("category")?.trim() || "";
   const allProductsQuery = searchParams.get("q")?.trim() || "";
   const normalizedSelectedCategory = selectedCategory.toLowerCase();
+  const buildCategoryLink = (categoryName?: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (categoryName) {
+      params.set("category", categoryName);
+    } else {
+      params.delete("category");
+    }
+    const query = params.toString();
+    return query ? `/?${query}#products` : "/#products";
+  };
 
   useEffect(() => {
     const syncCatalog = (productList: Product[], page: number, moreAvailable: boolean) => {
@@ -179,6 +201,7 @@ function StorePage() {
         products: productList,
         currentPage: page,
         hasMore: moreAvailable,
+        pageSize: catalogPageSize,
       });
       cacheProducts(productList);
     };
@@ -186,7 +209,7 @@ function StorePage() {
     const loadInitialProducts = () => {
       const token = localStorage.getItem("auth_token") || undefined;
       productApi
-        .list(token, 0, 20)
+        .list(token, 0, catalogPageSize)
         .then((response) => {
           syncCatalog(response.content, 0, !response.last);
         })
@@ -206,7 +229,7 @@ function StorePage() {
 
     window.addEventListener("products-changed", handleProductsChanged);
     return () => window.removeEventListener("products-changed", handleProductsChanged);
-  }, []);
+  }, [cachedCatalog, catalogPageSize]);
 
   useEffect(() => {
     cacheProducts(products);
@@ -215,9 +238,10 @@ function StorePage() {
         products,
         currentPage,
         hasMore,
+        pageSize: catalogPageSize,
       });
     }
-  }, [products, currentPage, hasMore]);
+  }, [products, currentPage, hasMore, catalogPageSize]);
 
   const loadMore = () => {
     if (loadingMore || !hasMore) return;
@@ -225,7 +249,7 @@ function StorePage() {
     const nextPage = currentPage + 1;
     setLoadingMore(true);
     productApi
-      .list(token, nextPage, 20)
+      .list(token, nextPage, catalogPageSize)
       .then((response) => {
         setProducts((prev) => {
           const merged = [...prev, ...response.content];
@@ -233,6 +257,7 @@ function StorePage() {
             products: merged,
             currentPage: nextPage,
             hasMore: !response.last,
+            pageSize: catalogPageSize,
           });
           cacheProducts(response.content);
           return merged;
@@ -435,6 +460,7 @@ function StorePage() {
                   <img
                     alt={tile.title}
                     className="h-36 w-full bg-slate-100 object-contain transition duration-500 group-hover:scale-105 md:h-40"
+                    decoding="async"
                     src={tile.image}
                   />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/80 via-slate-900/40 to-transparent p-3 text-white">
@@ -484,7 +510,7 @@ function StorePage() {
                 {selectedCategory && (
                   <Link
                     className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    to="/"
+                    to={buildCategoryLink(undefined)}
                   >
                     Clear Category
                   </Link>
@@ -543,6 +569,8 @@ function StorePage() {
                                 <img
                                   alt={product.name}
                                   className="h-36 w-full bg-slate-100 object-contain transition duration-500 group-hover:scale-105 md:h-40"
+                                  decoding="async"
+                                  loading="lazy"
                                   src={product.imageUrls?.[0] || `https://picsum.photos/seed/promo-${product.id}/900/650`}
                                 />
                                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/85 via-slate-900/45 to-transparent p-3 text-white">
@@ -589,13 +617,13 @@ function StorePage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {categories.map((category) => (
-                <a
+                <Link
                   className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={`#${categoryAnchor(category.name)}`}
+                  to={buildCategoryLink(category.name)}
                   key={category.name}
                 >
                   {category.name} ({category.products.length})
-                </a>
+                </Link>
               ))}
             </div>
 
@@ -604,22 +632,35 @@ function StorePage() {
                 No categories match your search.
               </p>
             ) : (
-              <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {categories.map((category) => (
                   <article
-                    className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg"
-                    id={categoryAnchor(category.name)}
+                    className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg"
                     key={category.name}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <h4 className="text-lg font-semibold">{category.name}</h4>
                       <p className="text-sm text-slate-500">{category.products.length} products</p>
                     </div>
-                    <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                      {category.products.map((product) => (
-                        <ProductCard key={`category-${category.name}-${product.id}`} onAddToCart={onAddToCart} product={product} />
+                    <p className="text-sm text-slate-600">
+                      Newest item: <span className="font-medium text-slate-900">{category.products[0]?.name ?? "No products yet"}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {category.products.slice(0, 3).map((product) => (
+                        <span
+                          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
+                          key={`category-preview-${category.name}-${product.id}`}
+                        >
+                          {product.name}
+                        </span>
                       ))}
                     </div>
+                    <Link
+                      className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      to={buildCategoryLink(category.name)}
+                    >
+                      {normalizedSelectedCategory === category.name.toLowerCase() ? "Jump to Products" : "Browse Category"}
+                    </Link>
                   </article>
                 ))}
               </div>
