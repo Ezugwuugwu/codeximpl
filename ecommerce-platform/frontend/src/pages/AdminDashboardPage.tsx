@@ -97,7 +97,7 @@ function AdminDashboardPage() {
         navigate("/", { replace: true });
         return;
       }
-    } catch {
+    } catch (err: unknown) {
       navigate("/login", { replace: true });
       return;
     }
@@ -307,8 +307,15 @@ function AdminDashboardPage() {
       window.dispatchEvent(new Event("products-changed"));
       setProductActionSuccess(`Product updated: ${updated.name}`);
       cancelEdit();
-    } catch {
-      setProductActionError("Could not update product. Verify your admin token is valid.");
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 413) {
+        setProductActionError("Photos are too large. Use smaller images (try under 2 MB each).");
+      } else if (status === 401 || status === 403) {
+        setProductActionError("Access denied. Your admin session may have expired — log out and back in.");
+      } else {
+        setProductActionError("Could not update product. Check your connection and try again.");
+      }
     } finally {
       setEditing(false);
     }
@@ -336,8 +343,13 @@ function AdminDashboardPage() {
         cancelEdit();
       }
       setProductActionSuccess(`Product deleted: ${product.name}`);
-    } catch {
-      setProductActionError("Could not delete product. Verify your admin token is valid.");
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) {
+        setProductActionError("Access denied. Your admin session may have expired — log out and back in.");
+      } else {
+        setProductActionError("Could not delete product. Check your connection and try again.");
+      }
     } finally {
       setDeletingProductId(null);
     }
@@ -383,8 +395,15 @@ function AdminDashboardPage() {
       setSelectedFiles([]);
       setPhotoPreviews([]);
       setFormSuccess(`Product added: ${created.name}`);
-    } catch {
-      setFormError("Could not create product. Verify your admin token is valid.");
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 413) {
+        setFormError("Photos are too large. Use smaller images (try under 2 MB each).");
+      } else if (status === 403 || status === 401) {
+        setFormError("Access denied. Your admin session may have expired — log out and back in.");
+      } else {
+        setFormError("Could not create product. Check your connection and try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -396,7 +415,7 @@ function AdminDashboardPage() {
     try {
       const result = await orderApi.listAll(token, 0, 500);
       setOrders(result.content);
-    } catch {
+    } catch (err: unknown) {
       // silently ignore refresh errors
     } finally {
       setRefreshingOrders(false);

@@ -6,6 +6,9 @@ security:
     secret: ${JWT_SECRET}
 
 spring:
+  codec:
+    # Allow large JSON payloads (product creation with base64 images — up to 8 × ~3 MB).
+    max-in-memory-size: 25MB
   cloud:
     gateway:
       default-filters:
@@ -127,6 +130,27 @@ resilience4j:
         sliding-window-size: 10
         minimum-number-of-calls: 5
         failure-rate-threshold: 50
+      cartServiceCircuit:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+      paymentServiceCircuit:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+      adminServiceCircuit:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+      notificationServiceCircuit:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+
+cors:
+  # Comma-separated list of allowed origins. Defaults to * (permissive) if not set.
+  # Override in production: CORS_ALLOWED_ORIGINS=https://okangamart.com
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
 
 management:
   endpoint:

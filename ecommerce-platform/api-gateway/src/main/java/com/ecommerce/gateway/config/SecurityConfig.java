@@ -52,9 +52,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsWebFilter corsWebFilter() {
+    public CorsWebFilter corsWebFilter(
+            @Value("${cors.allowed-origins:*}") String allowedOrigins) {
         CorsConfiguration cors = new CorsConfiguration();
-        cors.addAllowedOriginPattern("*");
+        for (String origin : allowedOrigins.split(",")) {
+            cors.addAllowedOriginPattern(origin.trim());
+        }
         cors.addAllowedMethod("*");
         cors.addAllowedHeader("*");
         cors.setAllowCredentials(false);

@@ -1,5 +1,9 @@
 server:
   port: 8082
+  tomcat:
+    # Allow large JSON payloads (product creation with base64 images).
+    max-http-form-post-size: 26214400   # 25 MB
+    max-swallow-size: 26214400          # 25 MB
 
 security:
   jwt:

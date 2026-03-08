@@ -2,6 +2,17 @@ spring:
   main:
     # Create beans on first use instead of at startup — cuts boot time by ~30%.
     lazy-initialization: true
+  datasource:
+    hikari:
+      # Max connections per service. Keep low so multiple pods don't exhaust DB.
+      maximum-pool-size: 10
+      minimum-idle: 2
+      # Drop idle connections after 10 minutes.
+      idle-timeout: 600000
+      # Fail fast if a connection can't be acquired within 5 seconds.
+      connection-timeout: 5000
+      # Recycle connections every 30 minutes to prevent stale connections.
+      max-lifetime: 1800000
 
 eureka:
   instance:
