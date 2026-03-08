@@ -21,6 +21,7 @@ public class EmailNotificationService {
     public void send(NotificationMessage message) {
         try {
             SimpleMailMessage mail = new SimpleMailMessage();
+            mail.setFrom("Okanga Mart <support@okangamart.com>");
             mail.setTo(message.recipient());
             mail.setSubject(message.subject());
             mail.setText(message.body());
