@@ -8,7 +8,7 @@ security:
 spring:
   codec:
     # Allow large JSON payloads (product creation with base64 images — up to 8 × ~3 MB).
-    max-in-memory-size: 25MB
+    max-in-memory-size: -1
   cloud:
     gateway:
       default-filters:
