@@ -22,10 +22,6 @@ spring:
     port: ${SPRING_RABBITMQ_PORT:5672}
 
 payment:
-  stripe:
-    api-base-url: ${STRIPE_API_BASE_URL:https://api.stripe.com}
-    secret-key: ${STRIPE_SECRET_KEY:}
-    publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
   paystack:
     api-base-url: ${PAYSTACK_API_BASE_URL:https://api.paystack.co}
     secret-key: ${PAYSTACK_SECRET_KEY:}

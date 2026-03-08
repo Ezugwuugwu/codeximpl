@@ -5,11 +5,8 @@ import com.ecommerce.payment.domain.PaymentStatus;
 import com.ecommerce.payment.domain.PaymentTransaction;
 import com.ecommerce.payment.repository.OutboxEventRepository;
 import com.ecommerce.payment.repository.PaymentTransactionRepository;
-import com.ecommerce.payment.service.dto.PaymentIntentCreateRequest;
-import com.ecommerce.payment.service.dto.PaymentIntentCreateResponse;
 import com.ecommerce.payment.service.dto.PaymentProcessRequest;
 import com.ecommerce.payment.service.dto.PaymentProcessResponse;
-import com.ecommerce.payment.service.dto.StripePaymentIntent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -34,9 +31,6 @@ class PaymentProcessingServiceTest {
     private OutboxEventRepository outboxRepository;
 
     @Mock
-    private StripePaymentGateway cardGateway;
-
-    @Mock
     private PaystackPaymentGateway paystackGateway;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -46,7 +40,7 @@ class PaymentProcessingServiceTest {
     @BeforeEach
     void setUp() {
         service = new PaymentProcessingService(
-            repository, outboxRepository, objectMapper, cardGateway, paystackGateway,
+            repository, outboxRepository, objectMapper, paystackGateway,
             "commerce.events", "payment.processed");
     }
 
@@ -71,37 +65,6 @@ class PaymentProcessingServiceTest {
             new PaymentProcessRequest("ord-1", "user1", BigDecimal.ZERO, "USD", "CARD"));
 
         assertThat(response.status()).isEqualTo("DECLINED");
-    }
-
-    @Test
-    void process_cardPaymentMethod_succeededIntentWithMatchingAmount_approved() {
-        StripePaymentIntent intent = new StripePaymentIntent(
-            "pi_test", "secret", "succeeded", 5000L, "usd");
-        when(cardGateway.retrieveIntent("pi_test")).thenReturn(intent);
-        when(cardGateway.toMinor(BigDecimal.valueOf(50.00))).thenReturn(5000L);
-        when(repository.findTopByProviderReference("pi_test")).thenReturn(Optional.empty());
-
-        PaymentTransaction saved = savedTransaction("pay-3", PaymentStatus.APPROVED);
-        when(repository.save(any(PaymentTransaction.class))).thenReturn(saved);
-
-        PaymentProcessResponse response = service.process(
-            new PaymentProcessRequest("ord-1", "user1", BigDecimal.valueOf(50.00), "USD", "STRIPE:pi_test"));
-
-        assertThat(response.status()).isEqualTo("APPROVED");
-    }
-
-    @Test
-    void createCardIntent_delegatesToGatewayAndReturnsResponse() {
-        StripePaymentIntent intent = new StripePaymentIntent(
-            "pi_new", "cs_new", "requires_payment_method", 1000L, "usd");
-        when(cardGateway.createIntent("user1", BigDecimal.valueOf(10.00), "USD")).thenReturn(intent);
-        when(cardGateway.publishableKey()).thenReturn("pk_test_key");
-
-        PaymentIntentCreateResponse response = service.createIntent(
-            new PaymentIntentCreateRequest("user1", BigDecimal.valueOf(10.00), "USD"));
-
-        assertThat(response.paymentIntentId()).isEqualTo("pi_new");
-        assertThat(response.publishableKey()).isEqualTo("pk_test_key");
     }
 
     @Test

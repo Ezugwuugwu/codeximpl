@@ -5,13 +5,10 @@ import com.ecommerce.payment.domain.PaymentStatus;
 import com.ecommerce.payment.domain.PaymentTransaction;
 import com.ecommerce.payment.repository.OutboxEventRepository;
 import com.ecommerce.payment.repository.PaymentTransactionRepository;
-import com.ecommerce.payment.service.dto.PaymentIntentCreateRequest;
-import com.ecommerce.payment.service.dto.PaymentIntentCreateResponse;
 import com.ecommerce.payment.service.dto.PaymentProcessRequest;
 import com.ecommerce.payment.service.dto.PaymentProcessResponse;
 import com.ecommerce.payment.service.dto.PaystackInitializeRequest;
 import com.ecommerce.payment.service.dto.PaystackInitializeResponse;
-import com.ecommerce.payment.service.dto.StripePaymentIntent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
@@ -27,7 +24,6 @@ public class PaymentProcessingService {
     private final PaymentTransactionRepository repository;
     private final OutboxEventRepository outboxRepository;
     private final ObjectMapper objectMapper;
-    private final StripePaymentGateway stripeGateway;
     private final PaystackPaymentGateway paystackGateway;
     private final String exchange;
     private final String routingKey;
@@ -35,27 +31,15 @@ public class PaymentProcessingService {
     public PaymentProcessingService(PaymentTransactionRepository repository,
                                     OutboxEventRepository outboxRepository,
                                     ObjectMapper objectMapper,
-                                    StripePaymentGateway stripeGateway,
                                     PaystackPaymentGateway paystackGateway,
                                     @Value("${messaging.exchange.commerce:commerce.events}") String exchange,
                                     @Value("${messaging.routing.payment-processed:payment.processed}") String routingKey) {
         this.repository = repository;
         this.outboxRepository = outboxRepository;
         this.objectMapper = objectMapper;
-        this.stripeGateway = stripeGateway;
         this.paystackGateway = paystackGateway;
         this.exchange = exchange;
         this.routingKey = routingKey;
-    }
-
-    public PaymentIntentCreateResponse createIntent(PaymentIntentCreateRequest request) {
-        StripePaymentIntent intent = stripeGateway.createIntent(request.userId(), request.amount(), request.currency());
-        return new PaymentIntentCreateResponse(
-            intent.id(),
-            intent.clientSecret(),
-            stripeGateway.publishableKey(),
-            intent.status()
-        );
     }
 
     public PaystackInitializeResponse initializePaystack(PaystackInitializeRequest request) {
@@ -76,9 +60,6 @@ public class PaymentProcessingService {
             return new PaymentProcessResponse(tx.getId(), tx.getStatus().name(), "Payment already processed");
         }
 
-        if (isStripeMethod(request.method())) {
-            return processStripePayment(request, extractStripeIntentId(request.method()));
-        }
         if (isPaystackMethod(request.method())) {
             return processPaystackPayment(request, extractPaystackReference(request.method()));
         }
@@ -90,31 +71,6 @@ public class PaymentProcessingService {
         transaction.setStatus(request.amount().doubleValue() <= 0 ? PaymentStatus.DECLINED : PaymentStatus.APPROVED);
         PaymentTransaction saved = saveAndEnqueue(transaction);
         return new PaymentProcessResponse(saved.getId(), saved.getStatus().name(), "Payment processed");
-    }
-
-    private PaymentProcessResponse processStripePayment(PaymentProcessRequest request, String intentId) {
-        PaymentTransaction transaction = baseTransaction(request, "STRIPE", intentId);
-        StripePaymentIntent intent = stripeGateway.retrieveIntent(intentId);
-        PaymentStatus status = resolveStripeStatus(request, intent);
-        transaction.setStatus(status);
-        PaymentTransaction saved = saveAndEnqueue(transaction);
-        String message = status == PaymentStatus.APPROVED ? "Stripe card payment verified" : "Stripe card payment not verified";
-        return new PaymentProcessResponse(saved.getId(), status.name(), message);
-    }
-
-    private PaymentStatus resolveStripeStatus(PaymentProcessRequest request, StripePaymentIntent intent) {
-        if (!intent.isSucceeded()) {
-            return PaymentStatus.DECLINED;
-        }
-        if (stripeGateway.toMinor(request.amount()) != intent.amountMinor()) {
-            return PaymentStatus.DECLINED;
-        }
-        // A Stripe PaymentIntent is single-use. If it's already recorded against ANY order,
-        // decline — it cannot be applied again (prevents intent reuse across or within orders).
-        if (repository.findTopByProviderReference(intent.id()).isPresent()) {
-            return PaymentStatus.DECLINED;
-        }
-        return PaymentStatus.APPROVED;
     }
 
     private PaymentTransaction baseTransaction(PaymentProcessRequest request, String provider, String providerReference) {
@@ -148,15 +104,6 @@ public class PaymentProcessingService {
 
     private BigDecimal safeAmount(BigDecimal amount) {
         return amount == null ? BigDecimal.ZERO : amount;
-    }
-
-    private boolean isStripeMethod(String method) {
-        return method != null && method.startsWith("STRIPE:");
-    }
-
-    private String extractStripeIntentId(String method) {
-        String[] parts = method.split(":", 2);
-        return parts.length == 2 ? parts[1].trim() : "";
     }
 
     private boolean isPaystackMethod(String method) {

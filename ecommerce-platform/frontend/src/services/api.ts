@@ -6,8 +6,6 @@ import type {
   CreateOrderRequest,
   CustomerOrder,
   PagedResponse,
-  PaymentIntentCreateRequest,
-  PaymentIntentCreateResponse,
   PaystackInitializeRequest,
   PaystackInitializeResponse,
   Product,
@@ -155,13 +153,6 @@ export const orderApi = {
 };
 
 export const paymentApi = {
-  async createIntent(token: string, payload: PaymentIntentCreateRequest): Promise<PaymentIntentCreateResponse> {
-    const { data } = await api.post<PaymentIntentCreateResponse>("/api/v1/payments/intent", payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return data;
-  },
-
   async initializePaystack(token: string, payload: PaystackInitializeRequest): Promise<PaystackInitializeResponse> {
     const { data } = await api.post<PaystackInitializeResponse>("/api/v1/payments/paystack/initialize", payload, {
       headers: { Authorization: `Bearer ${token}` },

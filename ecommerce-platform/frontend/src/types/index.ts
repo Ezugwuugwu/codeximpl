@@ -92,19 +92,6 @@ export type CreateOrderRequest = {
   paymentIntentId?: string;
 };
 
-export type PaymentIntentCreateRequest = {
-  userId: string;
-  amount: number;
-  currency: string;
-};
-
-export type PaymentIntentCreateResponse = {
-  paymentIntentId: string;
-  clientSecret: string;
-  publishableKey: string;
-  status: string;
-};
-
 export type PaystackInitializeRequest = {
   email: string;
   amount: number;

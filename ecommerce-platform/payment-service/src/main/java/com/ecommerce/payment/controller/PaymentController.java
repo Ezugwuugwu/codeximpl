@@ -1,8 +1,6 @@
 package com.ecommerce.payment.controller;
 
 import com.ecommerce.payment.service.PaymentProcessingService;
-import com.ecommerce.payment.service.dto.PaymentIntentCreateRequest;
-import com.ecommerce.payment.service.dto.PaymentIntentCreateResponse;
 import com.ecommerce.payment.service.dto.PaymentProcessRequest;
 import com.ecommerce.payment.service.dto.PaymentProcessResponse;
 import com.ecommerce.payment.service.dto.PaystackInitializeRequest;
@@ -22,11 +20,6 @@ public class PaymentController {
 
     public PaymentController(PaymentProcessingService service) {
         this.service = service;
-    }
-
-    @PostMapping("/intent")
-    public ResponseEntity<PaymentIntentCreateResponse> createIntent(@Valid @RequestBody PaymentIntentCreateRequest request) {
-        return ResponseEntity.ok(service.createIntent(request));
     }
 
     @PostMapping("/process")
