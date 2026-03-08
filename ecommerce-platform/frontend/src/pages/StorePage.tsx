@@ -4,6 +4,7 @@ import ProductCard from "../components/ProductCard";
 import { useCart } from "../context/CartContext";
 import { productApi } from "../services/api";
 import type { Product } from "../types";
+import { cacheProducts, readCatalogCache, writeCatalogCache } from "../utils/productCache";
 
 type CategoryGroup = {
   name: string;
@@ -149,14 +150,15 @@ const matchesSearch = (product: Product, query: string) => {
 };
 
 function StorePage() {
+  const [cachedCatalog] = useState(() => readCatalogCache());
   const [searchParams] = useSearchParams();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>(() => cachedCatalog?.products ?? []);
+  const [loading, setLoading] = useState(() => cachedCatalog === null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[] | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(() => cachedCatalog?.currentPage ?? 0);
+  const [hasMore, setHasMore] = useState(() => cachedCatalog?.hasMore ?? false);
   const [statusMessage, setStatusMessage] = useState("");
   const [productGridColumns, setProductGridColumns] = useState(() =>
     typeof window === "undefined" ? 3 : getProductGridColumns(window.innerWidth)
@@ -169,17 +171,53 @@ function StorePage() {
   const normalizedSelectedCategory = selectedCategory.toLowerCase();
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token") || undefined;
-    productApi
-      .list(token, 0, 20)
-      .then((response) => {
-        setProducts(response.content);
-        setHasMore(!response.last);
-        setCurrentPage(0);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    const syncCatalog = (productList: Product[], page: number, moreAvailable: boolean) => {
+      setProducts(productList);
+      setCurrentPage(page);
+      setHasMore(moreAvailable);
+      writeCatalogCache({
+        products: productList,
+        currentPage: page,
+        hasMore: moreAvailable,
+      });
+      cacheProducts(productList);
+    };
+
+    const loadInitialProducts = () => {
+      const token = localStorage.getItem("auth_token") || undefined;
+      productApi
+        .list(token, 0, 20)
+        .then((response) => {
+          syncCatalog(response.content, 0, !response.last);
+        })
+        .finally(() => setLoading(false));
+    };
+
+    if (cachedCatalog === null) {
+      loadInitialProducts();
+    } else {
+      setLoading(false);
+    }
+
+    const handleProductsChanged = () => {
+      setLoading(true);
+      loadInitialProducts();
+    };
+
+    window.addEventListener("products-changed", handleProductsChanged);
+    return () => window.removeEventListener("products-changed", handleProductsChanged);
   }, []);
+
+  useEffect(() => {
+    cacheProducts(products);
+    if (products.length > 0) {
+      writeCatalogCache({
+        products,
+        currentPage,
+        hasMore,
+      });
+    }
+  }, [products, currentPage, hasMore]);
 
   const loadMore = () => {
     if (loadingMore || !hasMore) return;
@@ -189,7 +227,16 @@ function StorePage() {
     productApi
       .list(token, nextPage, 20)
       .then((response) => {
-        setProducts((prev) => [...prev, ...response.content]);
+        setProducts((prev) => {
+          const merged = [...prev, ...response.content];
+          writeCatalogCache({
+            products: merged,
+            currentPage: nextPage,
+            hasMore: !response.last,
+          });
+          cacheProducts(response.content);
+          return merged;
+        });
         setHasMore(!response.last);
         setCurrentPage(nextPage);
       })
@@ -399,11 +446,12 @@ function StorePage() {
 
               if (tile.productId) {
                 return (
-                  <Link
-                    className="group relative overflow-hidden rounded-2xl border border-white/70 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl"
-                    key={`hero-${tile.productId}`}
-                    to={`/products/${tile.productId}`}
-                  >
+                    <Link
+                      className="group relative overflow-hidden rounded-2xl border border-white/70 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl"
+                      key={`hero-${tile.productId}`}
+                      state={{ productPreview: sortedProducts.find((product) => product.id === tile.productId) }}
+                      to={`/products/${tile.productId}`}
+                    >
                     {tileContent}
                   </Link>
                 );
@@ -489,6 +537,7 @@ function StorePage() {
                               <Link
                                 className="group relative overflow-hidden rounded-2xl border border-white/60 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl"
                                 key={`promo-${sectionIndex}-${product.id}`}
+                                state={{ productPreview: product }}
                                 to={`/products/${product.id}`}
                               >
                                 <img

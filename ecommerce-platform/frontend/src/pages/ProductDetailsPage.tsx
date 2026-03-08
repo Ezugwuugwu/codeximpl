@@ -1,26 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { productApi } from "../services/api";
 import type { Product } from "../types";
 import axios from "axios";
 import RatingDisplay from "../components/RatingDisplay";
 import { getProductRating, getProductReviewCount } from "../utils/productPresentation";
+import { cacheProduct, readCachedProduct } from "../utils/productCache";
 
 const fallbackImage = "https://picsum.photos/seed/product-fallback/1000/700";
 
 function ProductDetailsPage() {
   const { productId } = useParams();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { cart, addToCart, removeFromCart } = useCart();
+  const numericProductId = Number(productId);
+  const routedPreview = (location.state as { productPreview?: Product } | null)?.productPreview ?? null;
+  const initialProduct = useMemo(
+    () => routedPreview ?? (Number.isFinite(numericProductId) ? readCachedProduct(numericProductId) : null),
+    [numericProductId, routedPreview]
+  );
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [selectedImage, setSelectedImage] = useState("");
+  const [product, setProduct] = useState<Product | null>(initialProduct);
+  const [selectedImage, setSelectedImage] = useState(initialProduct?.imageUrls?.[0] || "");
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState("");
   const [quantity, setQuantity] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialProduct === null);
   const openedFromCart = searchParams.get("from") === "cart";
   const quantityInitializedRef = useRef(false);
 
@@ -31,6 +39,13 @@ function ProductDetailsPage() {
     const match = cart?.items.find((item) => item.productId === product.id);
     return match?.quantity ?? 0;
   }, [cart?.items, product]);
+
+  useEffect(() => {
+    setLoadError("");
+    setProduct(initialProduct);
+    setSelectedImage(initialProduct?.imageUrls?.[0] || "");
+    setLoading(initialProduct === null);
+  }, [initialProduct, productId]);
 
   useEffect(() => {
     const id = Number(productId);
@@ -45,7 +60,8 @@ function ProductDetailsPage() {
       .getById(id, token)
       .then((result) => {
         setProduct(result);
-        setSelectedImage(result.imageUrls?.[0] || fallbackImage);
+        cacheProduct(result);
+        setSelectedImage((current) => current || result.imageUrls?.[0] || fallbackImage);
       })
       .catch((error) => {
         if (axios.isAxiosError(error)) {
@@ -62,7 +78,7 @@ function ProductDetailsPage() {
         setLoadError("Could not load product details right now. Please retry.");
       })
       .finally(() => setLoading(false));
-  }, [productId]);
+  }, [initialProduct, productId]);
 
   // Reset initialization when navigating to a different product
   useEffect(() => {

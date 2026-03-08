@@ -4,12 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.FetchType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,7 +38,13 @@ public class Product {
     @Column(nullable = false)
     private String category;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @Column(name = "primary_image_url", columnDefinition = "TEXT")
+    private String primaryImageUrl;
+
+    @Column(name = "image_count", nullable = false)
+    private Integer imageCount = 0;
+
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "image_url", columnDefinition = "TEXT")
     private List<String> imageUrls = new ArrayList<>();
@@ -103,6 +109,22 @@ public class Product {
 
     public void setImageUrls(List<String> imageUrls) {
         this.imageUrls = imageUrls;
+    }
+
+    public String getPrimaryImageUrl() {
+        return primaryImageUrl;
+    }
+
+    public void setPrimaryImageUrl(String primaryImageUrl) {
+        this.primaryImageUrl = primaryImageUrl;
+    }
+
+    public Integer getImageCount() {
+        return imageCount;
+    }
+
+    public void setImageCount(Integer imageCount) {
+        this.imageCount = imageCount;
     }
 
     public boolean isActive() {

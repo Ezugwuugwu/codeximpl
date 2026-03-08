@@ -2,6 +2,7 @@ package com.ecommerce.product.service;
 
 import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.repository.ProductRepository;
+import com.ecommerce.product.service.dto.ProductResponse;
 import com.ecommerce.product.service.dto.ProductRequest;
 import java.math.BigDecimal;
 import java.util.List;
@@ -46,9 +47,10 @@ class ProductCatalogServiceTest {
         Page<Product> page = new PageImpl<>(List.of(p), pageable, 1);
         when(repository.findByActiveTrue(pageable)).thenReturn(page);
 
-        Page<Product> result = service.listActiveProducts(pageable);
+        Page<ProductResponse> result = service.listActiveProducts(pageable);
 
-        assertThat(result.getContent()).hasSize(1).containsExactly(p);
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).id()).isEqualTo(1L);
         verify(repository).findByActiveTrue(pageable);
     }
 
@@ -57,9 +59,10 @@ class ProductCatalogServiceTest {
         Product p = buildProduct(1L, "Widget", true);
         when(repository.findById(1L)).thenReturn(Optional.of(p));
 
-        Product result = service.getById(1L);
+        ProductResponse result = service.getById(1L);
 
-        assertThat(result).isEqualTo(p);
+        assertThat(result.id()).isEqualTo(1L);
+        assertThat(result.name()).isEqualTo("Widget");
     }
 
     @Test
@@ -84,9 +87,9 @@ class ProductCatalogServiceTest {
             "https://picsum.photos/seed/blue-mug-3/1000/700"));
         when(repository.save(any(Product.class))).thenReturn(saved);
 
-        Product result = service.createProduct(request);
+        ProductResponse result = service.createProduct(request);
 
-        assertThat(result.getImageUrls()).hasSize(3)
+        assertThat(result.imageUrls()).hasSize(3)
             .allMatch(url -> url.startsWith("https://picsum.photos/seed/"));
     }
 
@@ -126,6 +129,8 @@ class ProductCatalogServiceTest {
         p.setPrice(BigDecimal.valueOf(9.99));
         p.setStock(10);
         p.setCategory("General");
+        p.setPrimaryImageUrl("https://example.com/widget.jpg");
+        p.setImageCount(1);
         p.setActive(active);
         return p;
     }

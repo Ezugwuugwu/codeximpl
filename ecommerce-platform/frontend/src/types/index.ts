@@ -15,6 +15,7 @@ export type Product = {
   price: number;
   stock: number;
   imageUrls: string[];
+  imageCount?: number;
   rating?: number;
   reviewCount?: number;
   active?: boolean;

@@ -1,8 +1,8 @@
 package com.ecommerce.product.controller;
 
-import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.service.ProductCatalogService;
 import com.ecommerce.product.service.dto.InventoryUpdateRequest;
+import com.ecommerce.product.service.dto.ProductResponse;
 import com.ecommerce.product.service.dto.ProductRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -34,7 +34,7 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<Product>> list(
+    public ResponseEntity<Page<ProductResponse>> list(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size) {
         var pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("updatedAt").descending());
@@ -42,29 +42,29 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getById(@PathVariable("id") Long id) {
+    public ResponseEntity<ProductResponse> getById(@PathVariable("id") Long id) {
         return ResponseEntity.ok(service.getById(id));
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<Product>> search(@RequestParam(required = false) String q) {
+    public ResponseEntity<List<ProductResponse>> search(@RequestParam(required = false) String q) {
         return ResponseEntity.ok(service.search(q));
     }
 
     @GetMapping("/recommendations/{userId}")
-    public ResponseEntity<List<Product>> recommendations(@PathVariable("userId") Long userId) {
+    public ResponseEntity<List<ProductResponse>> recommendations(@PathVariable("userId") Long userId) {
         return ResponseEntity.ok(service.recommendations(userId));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Product> create(@Valid @RequestBody ProductRequest request) {
+    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.createProduct(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Product> update(@PathVariable("id") Long id, @Valid @RequestBody ProductRequest request) {
+    public ResponseEntity<ProductResponse> update(@PathVariable("id") Long id, @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.ok(service.updateProduct(id, request));
     }
 
@@ -77,8 +77,8 @@ public class ProductController {
 
     @PatchMapping("/{id}/inventory")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Product> updateInventory(@PathVariable("id") Long id,
-                                                   @Valid @RequestBody InventoryUpdateRequest request) {
+    public ResponseEntity<ProductResponse> updateInventory(@PathVariable("id") Long id,
+                                                           @Valid @RequestBody InventoryUpdateRequest request) {
         return ResponseEntity.ok(service.updateInventory(id, request.stock()));
     }
 }

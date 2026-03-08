@@ -43,7 +43,7 @@ function ProductCard({ product, onAddToCart }: Props) {
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-b from-white via-white to-amber-50/60 shadow-lg transition hover:-translate-y-1 hover:shadow-2xl">
-      <Link to={`/products/${product.id}`} className="block">
+      <Link to={`/products/${product.id}`} className="block" state={{ productPreview: product }}>
         <img
           alt={product.name}
           className="h-48 w-full bg-slate-100 object-contain transition duration-300 group-hover:scale-[1.03]"
@@ -98,7 +98,11 @@ function ProductCard({ product, onAddToCart }: Props) {
             </svg>
             Add to Cart
           </button>
-          <Link className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700" to={`/products/${product.id}`}>
+          <Link
+            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+            state={{ productPreview: product }}
+            to={`/products/${product.id}`}
+          >
             View Details
           </Link>
         </div>

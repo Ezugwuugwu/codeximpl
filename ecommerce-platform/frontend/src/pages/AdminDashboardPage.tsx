@@ -4,6 +4,11 @@ import StatCard from "../components/StatCard";
 import LiveAgentInboxPanel from "../components/admin/LiveAgentInboxPanel";
 import { orderApi, productApi } from "../services/api";
 import type { AnalyticsOverview, CustomerOrder, Product, ProductCreateRequest } from "../types";
+import {
+  estimateDataUrlBytes,
+  MAX_PRODUCT_UPLOAD_BYTES,
+  optimizeImageForUpload,
+} from "../utils/imageUpload";
 
 type CategoryGroup = {
   name: string;
@@ -76,6 +81,7 @@ function AdminDashboardPage() {
   const [editSelectedFiles, setEditSelectedFiles] = useState<File[]>([]);
   const [editPhotoPreviews, setEditPhotoPreviews] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
+  const [loadingEditProductId, setLoadingEditProductId] = useState<number | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
   const [productActionError, setProductActionError] = useState("");
   const [productActionSuccess, setProductActionSuccess] = useState("");
@@ -224,13 +230,16 @@ function AdminDashboardPage() {
     return openCount > 0 ? `Orders pending fulfillment: ${openCount}` : "No critical incidents";
   }, [orders]);
 
-  const toDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error("Image read failed"));
-      reader.readAsDataURL(file);
-    });
+  const prepareImageUploads = async (files: File[]) => {
+    const imageUrls = await Promise.all(files.map((file) => optimizeImageForUpload(file)));
+    const totalBytes = imageUrls.reduce((sum, imageUrl) => sum + estimateDataUrlBytes(imageUrl), 0);
+
+    if (totalBytes > MAX_PRODUCT_UPLOAD_BYTES) {
+      throw new Error("UPLOAD_TOO_LARGE");
+    }
+
+    return imageUrls;
+  };
 
   const onFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -246,20 +255,34 @@ function AdminDashboardPage() {
     }
   };
 
-  const beginEdit = (product: Product) => {
-    setEditingProductId(product.id);
-    setEditForm({
-      name: product.name,
-      description: product.description,
-      category: product.category,
-      price: Number(product.price),
-      stock: product.stock,
-      imageUrls: product.imageUrls ?? [],
-    });
-    setEditSelectedFiles([]);
-    setEditPhotoPreviews(product.imageUrls ?? []);
+  const beginEdit = async (product: Product) => {
+    if (!token) {
+      setProductActionError("Session expired. Login again.");
+      return;
+    }
+
+    setLoadingEditProductId(product.id);
     setProductActionError("");
     setProductActionSuccess("");
+
+    try {
+      const fullProduct = await productApi.getById(product.id, token);
+      setEditingProductId(fullProduct.id);
+      setEditForm({
+        name: fullProduct.name,
+        description: fullProduct.description,
+        category: fullProduct.category,
+        price: Number(fullProduct.price),
+        stock: fullProduct.stock,
+        imageUrls: fullProduct.imageUrls ?? [],
+      });
+      setEditSelectedFiles([]);
+      setEditPhotoPreviews(fullProduct.imageUrls ?? []);
+    } catch {
+      setProductActionError("Could not load full product details. Check your connection and try again.");
+    } finally {
+      setLoadingEditProductId(null);
+    }
   };
 
   const cancelEdit = () => {
@@ -291,7 +314,7 @@ function AdminDashboardPage() {
     setEditing(true);
     try {
       const imageUrls = editSelectedFiles.length > 0
-        ? await Promise.all(editSelectedFiles.map((file) => toDataUrl(file)))
+        ? await prepareImageUploads(editSelectedFiles)
         : editForm.imageUrls;
 
       const updated = await productApi.update(token, productId, {
@@ -309,7 +332,10 @@ function AdminDashboardPage() {
       cancelEdit();
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 413) {
+      const message = err instanceof Error ? err.message : "";
+      if (message === "UPLOAD_TOO_LARGE") {
+        setProductActionError("Photos are still too large after optimization. Use fewer photos or smaller originals.");
+      } else if (status === 413) {
         setProductActionError("Photos are too large. Use smaller images (try under 2 MB each).");
       } else if (status === 401 || status === 403) {
         setProductActionError("Access denied. Your admin session may have expired — log out and back in.");
@@ -382,7 +408,7 @@ function AdminDashboardPage() {
 
     setSubmitting(true);
     try {
-      const imageUrls = await Promise.all(selectedFiles.map((file) => toDataUrl(file)));
+      const imageUrls = await prepareImageUploads(selectedFiles);
       const payload: ProductCreateRequest = {
         ...form,
         imageUrls,
@@ -397,7 +423,10 @@ function AdminDashboardPage() {
       setFormSuccess(`Product added: ${created.name}`);
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 413) {
+      const message = err instanceof Error ? err.message : "";
+      if (message === "UPLOAD_TOO_LARGE") {
+        setFormError("Photos are still too large after optimization. Use fewer photos or smaller originals.");
+      } else if (status === 413) {
         setFormError("Photos are too large. Use smaller images (try under 2 MB each).");
       } else if (status === 403 || status === 401) {
         setFormError("Access denied. Your admin session may have expired — log out and back in.");
@@ -675,7 +704,7 @@ function AdminDashboardPage() {
                   <p><span className="text-slate-500">Price:</span> ${Number(product.price).toFixed(2)}</p>
                   <p><span className="text-slate-500">Stock:</span> {product.stock}</p>
                   <p><span className="text-slate-500">Item ID:</span> {product.id}</p>
-                  <p><span className="text-slate-500">Photos:</span> {product.imageUrls?.length || 0}</p>
+                  <p><span className="text-slate-500">Photos:</span> {(product.imageCount ?? product.imageUrls?.length) || 0}</p>
                 </div>
                 <p className="mt-2 text-xs text-slate-400">
                   Updated: {product.updatedAt ? new Date(product.updatedAt).toLocaleString() : "N/A"}
@@ -683,11 +712,13 @@ function AdminDashboardPage() {
                 <div className="mt-4 flex items-center gap-2">
                   <button
                     className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-700 disabled:opacity-60"
-                    disabled={editing || deletingProductId === product.id}
-                    onClick={() => beginEdit(product)}
+                    disabled={editing || deletingProductId === product.id || loadingEditProductId === product.id}
+                    onClick={() => {
+                      void beginEdit(product);
+                    }}
                     type="button"
                   >
-                    Edit
+                    {loadingEditProductId === product.id ? "Loading..." : "Edit"}
                   </button>
                   <button
                     className="rounded-lg border border-red-300 px-3 py-1 text-sm text-red-700 disabled:opacity-60"
