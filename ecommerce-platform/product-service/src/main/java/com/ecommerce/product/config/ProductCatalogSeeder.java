@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class ProductCatalogSeeder implements CommandLineRunner {
@@ -25,14 +26,29 @@ public class ProductCatalogSeeder implements CommandLineRunner {
     }
 
     @Override
+    @Transactional
     public void run(String... args) {
         ensureImageColumnSupportsLargePayloads();
 
         List<Product> existing = repository.findAll();
         boolean patchedExisting = false;
         for (Product product : existing) {
-            if (product.getImageUrls() == null || product.getImageUrls().isEmpty()) {
-                product.setImageUrls(defaultImages(product.getName()));
+            boolean patchedProduct = false;
+            List<String> imageUrls = product.getImageUrls();
+            if (imageUrls == null || imageUrls.isEmpty()) {
+                imageUrls = defaultImages(product.getName());
+                product.setImageUrls(imageUrls);
+                patchedProduct = true;
+            }
+            if (product.getPrimaryImageUrl() == null && imageUrls != null && !imageUrls.isEmpty()) {
+                product.setPrimaryImageUrl(imageUrls.get(0));
+                patchedProduct = true;
+            }
+            if (product.getImageCount() == null || product.getImageCount() != (imageUrls == null ? 0 : imageUrls.size())) {
+                product.setImageCount(imageUrls == null ? 0 : imageUrls.size());
+                patchedProduct = true;
+            }
+            if (patchedProduct) {
                 product.setUpdatedAt(Instant.now());
                 patchedExisting = true;
             }
@@ -84,7 +100,10 @@ public class ProductCatalogSeeder implements CommandLineRunner {
         product.setPrice(new BigDecimal(price));
         product.setStock(stock);
         product.setCategory(category);
-        product.setImageUrls(defaultImages(name));
+        List<String> imageUrls = defaultImages(name);
+        product.setImageUrls(imageUrls);
+        product.setPrimaryImageUrl(imageUrls.get(0));
+        product.setImageCount(imageUrls.size());
         product.setActive(true);
         product.setUpdatedAt(Instant.now());
         return product;
