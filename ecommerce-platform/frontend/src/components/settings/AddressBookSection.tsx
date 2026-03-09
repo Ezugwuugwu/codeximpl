@@ -5,6 +5,7 @@ import type { UserAddress, UserAddressUpsertRequest } from "../../types";
 type AddressBookSectionProps = {
   token: string;
   onAddressesChanged?: () => Promise<void> | void;
+  createRequestToken?: number;
 };
 
 const emptyForm: UserAddressUpsertRequest = {
@@ -25,7 +26,7 @@ function formatAddress(address: UserAddress): string[] {
   ].filter((line) => line.trim().length > 0);
 }
 
-function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionProps) {
+function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 }: AddressBookSectionProps) {
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,6 +92,12 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
     setForm(emptyForm);
     setIsFormOpen(false);
   };
+
+  useEffect(() => {
+    if (createRequestToken > 0) {
+      openCreateForm();
+    }
+  }, [createRequestToken]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -190,8 +197,11 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
   };
 
   return (
-    <section className="rounded-3xl border border-[#f5c955] bg-[#fff8dd] p-6 shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-[#f1deb1] pb-5 md:flex-row md:items-end md:justify-between">
+    <section
+      id="address-section"
+      className="scroll-mt-24 rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-[#f5fbff] p-6 shadow-sm"
+    >
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Addresses</p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">Address book</h2>
@@ -213,7 +223,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
       {success && <p className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p>}
 
       {isFormOpen && (
-        <form className="mt-5 space-y-4 rounded-3xl border border-[#f5c955] bg-[#fffdf4] p-5" onSubmit={onSubmit}>
+        <form className="mt-5 space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5" onSubmit={onSubmit}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">
@@ -224,7 +234,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               </p>
             </div>
             <button
-              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-white"
               type="button"
               onClick={closeForm}
             >
@@ -348,7 +358,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
           <div className="h-24 animate-pulse rounded-3xl bg-slate-100" />
         </div>
       ) : addresses.length === 0 ? (
-        <div className="mt-5 rounded-3xl border border-dashed border-[#f5c955] bg-[#fffdf4] px-6 py-10 text-center">
+        <div className="mt-5 rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
           <p className="text-lg font-semibold text-slate-900">No saved addresses yet</p>
           <p className="mt-2 text-sm text-slate-500">
             Add your first delivery location here.
@@ -357,7 +367,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
       ) : (
         <div className="mt-5 grid gap-4">
           {addresses.map((address) => (
-            <div key={address.id} className="rounded-3xl border border-[#f1deb1] bg-[#fffdf4] p-5">
+            <div key={address.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
