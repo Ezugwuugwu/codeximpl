@@ -26,3 +26,9 @@ services:
     base-url: ${PRODUCT_SERVICE_URL:http://api-gateway:8080}
   order:
     base-url: ${ORDER_SERVICE_URL:http://api-gateway:8080}
+  notification:
+    base-url: ${NOTIFICATION_SERVICE_URL:http://api-gateway:8080}
+
+app:
+  support:
+    inbox-address: ${SUPPORT_INBOX_ADDRESS:support@okangamart.com}

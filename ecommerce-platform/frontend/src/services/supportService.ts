@@ -48,30 +48,9 @@ const readAdminReadState = (): Record<string, string> => {
 const writeAdminReadState = (state: Record<string, string>) => {
   localStorage.setItem(adminReadStateKey, JSON.stringify(state));
 };
-
-// ---- Contact message store (client-side localStorage) ----
-
-type ContactStore = {
-  messages: Array<ContactMessageReceipt & ContactMessageRequest>;
-};
-const contactStoreKey = "okanga_contact_messages_v1";
 const nowIso = () => new Date().toISOString();
 const supportBroadcastChannelName = "okanga_support";
 const isOpenLiveStatus = (status?: LiveAgentSession["status"]) => status === "QUEUED" || status === "IN_PROGRESS";
-
-const readContactStore = (): ContactStore => {
-  try {
-    const raw = localStorage.getItem(contactStoreKey);
-    return raw ? (JSON.parse(raw) as ContactStore) : { messages: [] };
-  } catch {
-    return { messages: [] };
-  }
-};
-
-const createMsgRef = () => {
-  const seed = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
-  return `MSG-${seed.slice(-10).toUpperCase()}`;
-};
 
 const emitSupportStoreUpdated = () => {
   window.dispatchEvent(new Event("support:store-updated"));
@@ -85,6 +64,7 @@ const emitSupportStoreUpdated = () => {
 // ---- API base ----
 
 const API = "/api/v1/support/sessions";
+const SUPPORT_API = "/api/v1/support";
 
 // ---- Service ----
 
@@ -244,7 +224,7 @@ export const supportService = {
   },
 
   listContactMessages(): Array<ContactMessageReceipt & ContactMessageRequest> {
-    return readContactStore().messages;
+    return [];
   },
 
   getSupportNotificationCount(params: {
@@ -267,28 +247,14 @@ export const supportService = {
       return (session.email || "").trim().toLowerCase() === normalizedEmail;
     }).length;
 
-    const messages = readContactStore().messages;
-    const messageCount = params.isAdmin
-      ? messages.length
-      : normalizedEmail
-        ? messages.filter((message) => (message.email || "").trim().toLowerCase() === normalizedEmail).length
-        : messages.length;
-
-    return liveCount + messageCount;
+    return liveCount;
   },
 
-  // Contact/message form (client-side only)
   async submitMessage(payload: ContactMessageRequest): Promise<ContactMessageReceipt> {
-    await new Promise((r) => setTimeout(r, 350));
-    const receipt: ContactMessageReceipt = {
-      reference: createMsgRef(),
-      status: "RECEIVED",
-      createdAt: nowIso(),
-    };
-    const store = readContactStore();
-    store.messages.unshift({ ...payload, ...receipt });
-    localStorage.setItem(contactStoreKey, JSON.stringify(store));
+    const { data } = await axios.post<ContactMessageReceipt>(`${SUPPORT_API}/messages`, payload, {
+      headers: authHeaders(),
+    });
     emitSupportStoreUpdated();
-    return receipt;
+    return data;
   },
 };

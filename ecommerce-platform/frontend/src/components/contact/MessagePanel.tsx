@@ -30,10 +30,15 @@ function MessagePanel() {
     }
     setSubmitting(true);
     setError("");
-    const result = await supportService.submitMessage(form);
-    setReceipt(result);
-    setForm(initialForm);
-    setSubmitting(false);
+    try {
+      const result = await supportService.submitMessage(form);
+      setReceipt(result);
+      setForm(initialForm);
+    } catch {
+      setError("We could not send your message right now. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -47,7 +52,11 @@ function MessagePanel() {
         <button className="md:col-span-2 rounded-xl bg-[#1f3550] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1b2d44] disabled:opacity-60" disabled={submitting} type="submit">{submitting ? "Sending..." : "Send Message"}</button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {receipt && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Message received. Reference: {receipt.reference}</p>}
+      {receipt && (
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Message received. Reference: {receipt.reference}. Our support team has been alerted by email.
+        </p>
+      )}
     </section>
   );
 }
