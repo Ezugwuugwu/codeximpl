@@ -5,7 +5,6 @@ import type { UserAddress, UserAddressUpsertRequest } from "../../types";
 type AddressBookSectionProps = {
   token: string;
   onAddressesChanged?: () => Promise<void> | void;
-  createRequestToken?: number;
 };
 
 const emptyForm: UserAddressUpsertRequest = {
@@ -26,7 +25,7 @@ function formatAddress(address: UserAddress): string[] {
   ].filter((line) => line.trim().length > 0);
 }
 
-function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 }: AddressBookSectionProps) {
+function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionProps) {
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,6 +78,7 @@ function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 
     setError("");
     setSuccess("");
     setIsFormOpen(true);
+    focusAddressForm();
   };
 
   const openEditForm = (address: UserAddress) => {
@@ -95,6 +95,7 @@ function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 
     setError("");
     setSuccess("");
     setIsFormOpen(true);
+    focusAddressForm();
   };
 
   const closeForm = () => {
@@ -102,13 +103,6 @@ function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 
     setForm(emptyForm);
     setIsFormOpen(false);
   };
-
-  useEffect(() => {
-    if (createRequestToken > 0) {
-      openCreateForm();
-      focusAddressForm();
-    }
-  }, [createRequestToken]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
