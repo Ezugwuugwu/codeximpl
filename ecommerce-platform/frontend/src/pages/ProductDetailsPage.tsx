@@ -7,6 +7,7 @@ import axios from "axios";
 import RatingDisplay from "../components/RatingDisplay";
 import { getProductRating, getProductReviewCount } from "../utils/productPresentation";
 import { cacheProduct, readCachedProduct } from "../utils/productCache";
+import { buildAuthEntryPath, getAuthSession } from "../utils/auth";
 
 const fallbackImage = "https://picsum.photos/seed/product-fallback/1000/700";
 
@@ -31,6 +32,7 @@ function ProductDetailsPage() {
   const [loading, setLoading] = useState(initialProduct === null);
   const openedFromCart = searchParams.get("from") === "cart";
   const quantityInitializedRef = useRef(false);
+  const authRedirectTarget = `${location.pathname}${location.search}${location.hash}`;
 
   const existingCartQuantity = useMemo(() => {
     if (!product) {
@@ -101,6 +103,10 @@ function ProductDetailsPage() {
     if (!product) {
       return;
     }
+    if (!getAuthSession().isAuthenticated) {
+      navigate(buildAuthEntryPath("login", authRedirectTarget, "cart"));
+      return;
+    }
     if (quantity <= 0) {
       setMessage("Quantity must be at least 1.");
       return;
@@ -119,6 +125,10 @@ function ProductDetailsPage() {
     if (!product) {
       return;
     }
+    if (!getAuthSession().isAuthenticated) {
+      navigate(buildAuthEntryPath("login", authRedirectTarget, "checkout"));
+      return;
+    }
     if (quantity <= 0) {
       setMessage("Quantity must be at least 1.");
       return;
@@ -133,6 +143,10 @@ function ProductDetailsPage() {
 
   const updateCartQuantity = async () => {
     if (!product) {
+      return;
+    }
+    if (!getAuthSession().isAuthenticated) {
+      navigate(buildAuthEntryPath("login", authRedirectTarget, "cart"));
       return;
     }
     if (quantity < 0) {

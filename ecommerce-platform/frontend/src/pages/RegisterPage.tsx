@@ -1,9 +1,11 @@
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "../services/api";
+import { buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [address, setAddress] = useState("");
@@ -12,6 +14,21 @@ function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const redirectTarget = sanitizeRedirectTarget(searchParams.get("redirect"));
+  const authIntent = searchParams.get("intent");
+  const authReason = searchParams.get("reason");
+  const loginPath = buildAuthEntryPath(
+    "login",
+    redirectTarget ?? "/",
+    authIntent === "checkout" ? "checkout" : authIntent === "cart" ? "cart" : undefined
+  );
+
+  const authPrompt =
+    authReason === "auth-required"
+      ? authIntent === "checkout"
+        ? "Create an account or sign in first to continue to checkout."
+        : "Create an account or sign in first to add items to your cart."
+      : "";
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -40,7 +57,16 @@ function RegisterPage() {
         password,
         confirmPassword,
       });
-      navigate(`/verify-otp?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+      const params = new URLSearchParams({
+        email: email.trim().toLowerCase(),
+      });
+      if (redirectTarget) {
+        params.set("redirect", redirectTarget);
+      }
+      if (authIntent === "checkout" || authIntent === "cart") {
+        params.set("intent", authIntent);
+      }
+      navigate(`/verify-otp?${params.toString()}`);
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number; data?: { message?: string } } })?.response?.status;
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -61,6 +87,7 @@ function RegisterPage() {
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
         <h2 className="mb-1 text-2xl font-semibold">Create an account</h2>
         <p className="mb-6 text-sm text-slate-500">Create your account and start shopping.</p>
+        {authPrompt && <p className="mb-4 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-800">{authPrompt}</p>}
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -177,7 +204,7 @@ function RegisterPage() {
 
         <p className="mt-5 text-center text-sm text-slate-500">
           Already have an account?{" "}
-          <Link className="font-medium text-ink underline underline-offset-2" to="/login">
+          <Link className="font-medium text-ink underline underline-offset-2" to={loginPath}>
             Log in
           </Link>
         </p>

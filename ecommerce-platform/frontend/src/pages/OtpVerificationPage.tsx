@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "../services/api";
+import { buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -8,6 +9,18 @@ function OtpVerificationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const email = searchParams.get("email") || "";
+  const redirectTarget = sanitizeRedirectTarget(searchParams.get("redirect"));
+  const authIntent = searchParams.get("intent");
+  const loginPath = buildAuthEntryPath(
+    "login",
+    redirectTarget ?? "/",
+    authIntent === "checkout" ? "checkout" : authIntent === "cart" ? "cart" : undefined
+  );
+  const registerPath = buildAuthEntryPath(
+    "register",
+    redirectTarget ?? "/",
+    authIntent === "checkout" ? "checkout" : authIntent === "cart" ? "cart" : undefined
+  );
 
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
@@ -38,7 +51,7 @@ function OtpVerificationPage() {
     try {
       await authApi.verifyOtp(email, otp);
       setSuccess("Email verified! You can now log in.");
-      setTimeout(() => navigate("/login"), 1500);
+      setTimeout(() => navigate(loginPath), 1500);
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(message || "Invalid or expired code. Please try again.");
@@ -120,7 +133,7 @@ function OtpVerificationPage() {
 
         <p className="mt-4 text-center text-sm text-slate-500">
           Wrong email?{" "}
-          <Link className="font-medium text-ink underline underline-offset-2" to="/register">
+          <Link className="font-medium text-ink underline underline-offset-2" to={registerPath}>
             Go back
           </Link>
         </p>

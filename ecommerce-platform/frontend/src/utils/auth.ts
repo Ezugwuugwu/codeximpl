@@ -13,6 +13,8 @@ export type AuthSession = {
   isAdmin: boolean;
 };
 
+export type AuthRedirectIntent = "cart" | "checkout";
+
 type JwtPayload = {
   sub?: string;
   role?: string;
@@ -93,4 +95,32 @@ export function isTokenExpired(token: string): boolean {
     return false;
   }
   return payload.exp * 1000 < Date.now();
+}
+
+export function sanitizeRedirectTarget(target: string | null | undefined): string | null {
+  if (!target) {
+    return null;
+  }
+  if (!target.startsWith("/") || target.startsWith("//")) {
+    return null;
+  }
+  return target;
+}
+
+export function buildAuthEntryPath(
+  mode: "login" | "register",
+  redirectTo: string,
+  intent?: AuthRedirectIntent
+): string {
+  const params = new URLSearchParams();
+  const sanitizedTarget = sanitizeRedirectTarget(redirectTo);
+  if (sanitizedTarget) {
+    params.set("redirect", sanitizedTarget);
+  }
+  params.set("reason", "auth-required");
+  if (intent) {
+    params.set("intent", intent);
+  }
+  const query = params.toString();
+  return `/${mode}${query ? `?${query}` : ""}`;
 }

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import { useCart } from "../context/CartContext";
 import { productApi } from "../services/api";
 import type { Product } from "../types";
+import { buildAuthEntryPath, getAuthSession } from "../utils/auth";
 import { cacheProducts, readCatalogCache, writeCatalogCache } from "../utils/productCache";
 
 type HeroTile = {
@@ -153,6 +154,8 @@ const matchesSearch = (product: Product, query: string) => {
 };
 
 function StorePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [catalogPageSize] = useState(() => getCatalogPageSize());
   const [cachedCatalog] = useState(() => {
     const cache = readCatalogCache();
@@ -315,6 +318,11 @@ function StorePage() {
   const sortedProducts = useMemo(() => [...products].sort(productNewestFirst), [products]);
 
   const onAddToCart = async (product: Product, quantity: number) => {
+    if (!getAuthSession().isAuthenticated) {
+      navigate(buildAuthEntryPath("login", `${location.pathname}${location.search}${location.hash}`, "cart"));
+      return;
+    }
+
     try {
       await addToCart(product, quantity);
       setStatusMessage(`${quantity} x ${product.name} added to cart.`);

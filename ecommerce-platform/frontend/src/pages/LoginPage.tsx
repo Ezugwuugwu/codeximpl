@@ -1,14 +1,30 @@
 import { FormEvent, useState } from "react";
 import { authApi } from "../services/api";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import { setAuthToken } from "../utils/auth";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { buildAuthEntryPath, sanitizeRedirectTarget, setAuthToken } from "../utils/auth";
 
 function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTarget = sanitizeRedirectTarget(searchParams.get("redirect"));
+  const authIntent = searchParams.get("intent");
+  const authReason = searchParams.get("reason");
+  const registerPath = buildAuthEntryPath(
+    "register",
+    redirectTarget ?? "/",
+    authIntent === "checkout" ? "checkout" : authIntent === "cart" ? "cart" : undefined
+  );
+
+  const authPrompt =
+    authReason === "auth-required"
+      ? authIntent === "checkout"
+        ? "Sign in or create an account to continue to checkout."
+        : "Sign in or create an account to add items to your cart."
+      : "";
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -16,7 +32,7 @@ function LoginPage() {
     try {
       const response = await authApi.login(email, password);
       setAuthToken(response.token);
-      navigate(response.role === "ADMIN" ? "/admin" : "/");
+      navigate(redirectTarget ?? (response.role === "ADMIN" ? "/admin" : "/"));
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const status = err.response?.status;
@@ -42,6 +58,7 @@ function LoginPage() {
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
         <h2 className="mb-1 text-2xl font-semibold">Sign in</h2>
         <p className="mb-6 text-sm text-slate-500">Welcome back to Okanga Mart.</p>
+        {authPrompt && <p className="mb-4 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-800">{authPrompt}</p>}
         <form className="space-y-4" onSubmit={onSubmit}>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="email">Email address</label>
@@ -76,7 +93,9 @@ function LoginPage() {
         </form>
         <p className="mt-5 text-center text-sm text-slate-500">
           Don't have an account?{" "}
-          <a className="font-medium text-ink underline underline-offset-2" href="/register">Register</a>
+          <Link className="font-medium text-ink underline underline-offset-2" to={registerPath}>
+            Register
+          </Link>
         </p>
       </div>
     </div>
