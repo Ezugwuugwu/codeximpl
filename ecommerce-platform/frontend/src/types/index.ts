@@ -93,6 +93,14 @@ export type PasswordChangeRequest = {
   confirmNewPassword: string;
 };
 
+export type NotificationPreferences = {
+  orderUpdatesEnabled: boolean;
+  accountAlertsEnabled: boolean;
+  marketingEmailsEnabled: boolean;
+};
+
+export type NotificationPreferencesUpdateRequest = NotificationPreferences;
+
 export type UserAddress = {
   id: number;
   label: string;

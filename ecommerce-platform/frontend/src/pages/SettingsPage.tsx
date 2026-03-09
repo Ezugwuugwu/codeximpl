@@ -1,11 +1,13 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import AddressBookSection from "../components/settings/AddressBookSection";
+import NotificationPreferencesSection from "../components/settings/NotificationPreferencesSection";
+import OrderHistorySection from "../components/settings/OrderHistorySection";
 import { userApi } from "../services/api";
 import type { UserProfile } from "../types";
 import { clearAuthToken, getAuthSession } from "../utils/auth";
 
-type SettingsSection = "menu" | "profile" | "security" | "addresses";
+type SettingsSection = "menu" | "profile" | "security" | "addresses" | "orders" | "notifications";
 type SettingsIconProps = {
   className?: string;
 };
@@ -53,6 +55,34 @@ function AddressIcon({ className = "h-5 w-5" }: SettingsIconProps) {
   );
 }
 
+function OrdersIcon({ className = "h-5 w-5" }: SettingsIconProps) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
+      <path
+        d="M7 7h10M7 12h10M7 17h6M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function NotificationsIcon({ className = "h-5 w-5" }: SettingsIconProps) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
+      <path
+        d="M15 18a3 3 0 1 1-6 0m10-2H5l1.5-1.8A2 2 0 0 0 7 12.92V10a5 5 0 1 1 10 0v2.92c0 .46.16.9.45 1.26L19 16Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 function ChevronIcon({ className = "h-4 w-4" }: SettingsIconProps) {
   return (
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
@@ -88,16 +118,36 @@ const settingsNavigation = [
     description: "Add or choose the delivery address your orders should use.",
     Icon: AddressIcon,
   },
+  {
+    key: "orders",
+    label: "Order history",
+    description: "Review past purchases, item counts, and order statuses.",
+    Icon: OrdersIcon,
+  },
+  {
+    key: "notifications",
+    label: "Notifications",
+    description: "Choose which account, order, and marketing emails you receive.",
+    Icon: NotificationsIcon,
+  },
  ] as const;
 
 const sectionFocusTargets: Record<Exclude<SettingsSection, "menu">, string> = {
   profile: "settings-first-name",
   security: "settings-current-password",
   addresses: "address-label",
+  orders: "settings-orders-heading",
+  notifications: "notifications-order-updates",
 };
 
 function parseSection(value: string | null): SettingsSection {
-  if (value === "profile" || value === "security" || value === "addresses") {
+  if (
+    value === "profile" ||
+    value === "security" ||
+    value === "addresses" ||
+    value === "orders" ||
+    value === "notifications"
+  ) {
     return value;
   }
   return "menu";
@@ -496,6 +546,10 @@ function SettingsPage() {
                 }}
               />
             )}
+
+            {activeSection === "orders" && <OrderHistorySection token={authSession.token} />}
+
+            {activeSection === "notifications" && <NotificationPreferencesSection token={authSession.token} />}
 
             {activeSection === "security" && (
               <section id="security-section" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-[#f5fbff] p-6 shadow-sm">

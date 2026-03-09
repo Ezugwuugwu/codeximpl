@@ -5,6 +5,8 @@ import type {
   Cart,
   CreateOrderRequest,
   CustomerOrder,
+  NotificationPreferences,
+  NotificationPreferencesUpdateRequest,
   PagedResponse,
   PasswordChangeRequest,
   PaystackInitializeRequest,
@@ -93,6 +95,27 @@ export const userApi = {
 
   async changePassword(token: string, payload: PasswordChangeRequest): Promise<{ message: string }> {
     const { data } = await api.put<{ message: string }>("/api/v1/users/me/password", payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async getNotificationPreferences(token: string): Promise<NotificationPreferences> {
+    const { data } = await api.get<NotificationPreferences>("/api/v1/users/me/notification-preferences", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async updateNotificationPreferences(
+    token: string,
+    payload: NotificationPreferencesUpdateRequest
+  ): Promise<NotificationPreferences> {
+    const { data } = await api.put<NotificationPreferences>("/api/v1/users/me/notification-preferences", payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -215,6 +238,13 @@ export const orderApi = {
   async listAll(token: string, page = 0, size = 25): Promise<PagedResponse<CustomerOrder>> {
     const { data } = await api.get<PagedResponse<CustomerOrder>>("/api/v1/orders", {
       params: { page, size },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  },
+
+  async listMine(token: string): Promise<CustomerOrder[]> {
+    const { data } = await api.get<CustomerOrder[]>("/api/v1/orders/my", {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data;

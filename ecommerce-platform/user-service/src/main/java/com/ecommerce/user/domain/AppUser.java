@@ -46,6 +46,15 @@ public class AppUser implements UserDetails {
     private boolean enabled = false;
 
     @Column(nullable = false)
+    private boolean orderUpdatesEnabled = true;
+
+    @Column(nullable = false)
+    private boolean accountAlertsEnabled = true;
+
+    @Column(nullable = false)
+    private boolean marketingEmailsEnabled = false;
+
+    @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
     public Long getId() {
@@ -107,6 +116,30 @@ public class AppUser implements UserDetails {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isOrderUpdatesEnabled() {
+        return orderUpdatesEnabled;
+    }
+
+    public void setOrderUpdatesEnabled(boolean orderUpdatesEnabled) {
+        this.orderUpdatesEnabled = orderUpdatesEnabled;
+    }
+
+    public boolean isAccountAlertsEnabled() {
+        return accountAlertsEnabled;
+    }
+
+    public void setAccountAlertsEnabled(boolean accountAlertsEnabled) {
+        this.accountAlertsEnabled = accountAlertsEnabled;
+    }
+
+    public boolean isMarketingEmailsEnabled() {
+        return marketingEmailsEnabled;
+    }
+
+    public void setMarketingEmailsEnabled(boolean marketingEmailsEnabled) {
+        this.marketingEmailsEnabled = marketingEmailsEnabled;
     }
 
     public Instant getCreatedAt() {

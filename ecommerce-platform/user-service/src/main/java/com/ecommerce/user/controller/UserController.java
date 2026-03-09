@@ -2,9 +2,12 @@ package com.ecommerce.user.controller;
 
 import com.ecommerce.user.domain.AppUser;
 import com.ecommerce.user.service.UserAddressService;
+import com.ecommerce.user.service.UserNotificationPreferencesService;
 import com.ecommerce.user.service.UserProfileService;
 import com.ecommerce.user.service.UserSecurityService;
 import com.ecommerce.user.service.dto.ChangePasswordRequest;
+import com.ecommerce.user.service.dto.NotificationPreferencesResponse;
+import com.ecommerce.user.service.dto.UpdateNotificationPreferencesRequest;
 import com.ecommerce.user.service.dto.UpdateUserProfileRequest;
 import com.ecommerce.user.service.dto.UpsertUserAddressRequest;
 import com.ecommerce.user.service.dto.UserAddressResponse;
@@ -32,13 +35,16 @@ public class UserController {
     private final UserProfileService userProfileService;
     private final UserSecurityService userSecurityService;
     private final UserAddressService userAddressService;
+    private final UserNotificationPreferencesService userNotificationPreferencesService;
 
     public UserController(UserProfileService userProfileService,
                           UserSecurityService userSecurityService,
-                          UserAddressService userAddressService) {
+                          UserAddressService userAddressService,
+                          UserNotificationPreferencesService userNotificationPreferencesService) {
         this.userProfileService = userProfileService;
         this.userSecurityService = userSecurityService;
         this.userAddressService = userAddressService;
+        this.userNotificationPreferencesService = userNotificationPreferencesService;
     }
 
     @GetMapping("/me")
@@ -58,6 +64,19 @@ public class UserController {
         userSecurityService.changePassword(user, request);
         return ResponseEntity.status(HttpStatus.OK)
             .body(Map.of("message", "Password updated successfully."));
+    }
+
+    @GetMapping("/me/notification-preferences")
+    public ResponseEntity<NotificationPreferencesResponse> currentNotificationPreferences(
+            @AuthenticationPrincipal AppUser user) {
+        return ResponseEntity.ok(userNotificationPreferencesService.getCurrentPreferences(user));
+    }
+
+    @PutMapping("/me/notification-preferences")
+    public ResponseEntity<NotificationPreferencesResponse> updateCurrentNotificationPreferences(
+            @AuthenticationPrincipal AppUser user,
+            @Valid @RequestBody UpdateNotificationPreferencesRequest request) {
+        return ResponseEntity.ok(userNotificationPreferencesService.updateCurrentPreferences(user, request));
     }
 
     @GetMapping("/me/addresses")
