@@ -6,7 +6,9 @@ import com.ecommerce.order.domain.OrderStatus;
 import com.ecommerce.order.domain.OutboxEvent;
 import com.ecommerce.order.repository.CustomerOrderRepository;
 import com.ecommerce.order.repository.OutboxEventRepository;
+import com.ecommerce.order.service.dto.CreateGuestOrderRequest;
 import com.ecommerce.order.service.dto.CreateOrderRequest;
+import com.ecommerce.order.service.dto.GuestCustomerRequest;
 import com.ecommerce.order.service.dto.OrderItemRequest;
 import com.ecommerce.order.service.dto.PaymentRequest;
 import com.ecommerce.order.service.dto.PaymentResponse;
@@ -16,6 +18,7 @@ import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,39 +59,22 @@ public class OrderProcessingService {
 
     @Transactional
     public CustomerOrder createOrder(String userId, CreateOrderRequest request) {
-        CustomerOrder order = new CustomerOrder();
-        order.setUserId(userId);
-        order.setStatus(OrderStatus.PAYMENT_PENDING);
-
-        BigDecimal total = BigDecimal.ZERO;
-        for (OrderItemRequest itemRequest : request.items()) {
-            OrderItem item = new OrderItem();
-            item.setProductId(itemRequest.productId());
-            item.setProductName(itemRequest.productName());
-            item.setQuantity(itemRequest.quantity());
-            item.setUnitPrice(itemRequest.unitPrice());
-            total = total.add(itemRequest.unitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity())));
-            order.addItem(item);
-        }
-
-        order.setTotalAmount(total);
+        CustomerOrder order = initializeOrder(userId, request.items());
+        order.setGuestCheckout(false);
+        order.setCustomerEmail(normalizeEmail(userId));
         CustomerOrder saved = repository.save(order);
+        finalizeOrder(saved, request.paymentIntentId());
+        return saved;
+    }
 
-        // Notify user the order was placed (status: PAYMENT_PENDING)
-        saveToOutbox(saved, "PENDING");
-
-        String resolvedMethod = resolvePaymentMethod(request.paymentIntentId());
-
-        if (isPaystackMethod(resolvedMethod)) {
-            // Paystack: payment is already completed in the browser popup before the order is
-            // created. Verify synchronously so the order status is set to PAID immediately
-            // instead of waiting for the async RabbitMQ chain.
-            verifyPaystackPaymentSync(saved, resolvedMethod);
-        } else {
-            // All other payment methods: enqueue via the outbox for async processing.
-            enqueuePaymentRequest(saved, resolvedMethod);
-        }
-
+    @Transactional
+    public CustomerOrder createGuestOrder(CreateGuestOrderRequest request) {
+        String guestEmail = normalizeEmail(request.customer().email());
+        CustomerOrder order = initializeOrder(guestEmail, request.items());
+        order.setGuestCheckout(true);
+        applyGuestCustomer(order, request.customer());
+        CustomerOrder saved = repository.save(order);
+        finalizeOrder(saved, request.paymentIntentId());
         return saved;
     }
 
@@ -112,6 +98,49 @@ public class OrderProcessingService {
         CustomerOrder saved = repository.save(order);
         saveToOutbox(saved, status.name());
         return saved;
+    }
+
+    private CustomerOrder initializeOrder(String userId, List<OrderItemRequest> itemRequests) {
+        CustomerOrder order = new CustomerOrder();
+        order.setUserId(userId);
+        order.setStatus(OrderStatus.PAYMENT_PENDING);
+
+        BigDecimal total = BigDecimal.ZERO;
+        for (OrderItemRequest itemRequest : itemRequests) {
+            OrderItem item = new OrderItem();
+            item.setProductId(itemRequest.productId());
+            item.setProductName(itemRequest.productName());
+            item.setQuantity(itemRequest.quantity());
+            item.setUnitPrice(itemRequest.unitPrice());
+            total = total.add(itemRequest.unitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity())));
+            order.addItem(item);
+        }
+
+        order.setTotalAmount(total);
+        return order;
+    }
+
+    private void finalizeOrder(CustomerOrder order, String paymentIntentId) {
+        saveToOutbox(order, "PENDING");
+
+        String resolvedMethod = resolvePaymentMethod(paymentIntentId);
+        if (isPaystackMethod(resolvedMethod)) {
+            verifyPaystackPaymentSync(order, resolvedMethod);
+            return;
+        }
+
+        enqueuePaymentRequest(order, resolvedMethod);
+    }
+
+    private void applyGuestCustomer(CustomerOrder order, GuestCustomerRequest customer) {
+        order.setCustomerEmail(normalizeEmail(customer.email()));
+        order.setCustomerFirstName(customer.firstName().trim());
+        order.setCustomerLastName(customer.lastName().trim());
+        order.setShippingStreetAddress(customer.streetAddress().trim());
+        order.setShippingCity(customer.city().trim());
+        order.setShippingState(customer.state().trim());
+        order.setShippingPostalCode(customer.postalCode().trim());
+        order.setShippingCountry(customer.country().trim());
     }
 
     private void verifyPaystackPaymentSync(CustomerOrder order, String method) {
@@ -159,30 +188,54 @@ public class OrderProcessingService {
     private void saveToOutbox(CustomerOrder order, String paymentState) {
         try {
             List<Map<String, Object>> items = order.getItems().stream()
-                .map(item -> {
-                    Map<String, Object> payload = new LinkedHashMap<>();
-                    payload.put("productId", item.getProductId());
-                    payload.put("productName", item.getProductName());
-                    payload.put("quantity", item.getQuantity());
-                    payload.put("unitPrice", item.getUnitPrice().toString());
-                    payload.put("lineTotal", item.getUnitPrice()
-                        .multiply(BigDecimal.valueOf(item.getQuantity()))
-                        .toString());
-                    return payload;
-                })
+                .map(this::toItemPayload)
                 .toList();
-            String payload = objectMapper.writeValueAsString(Map.of(
-                "orderId",      order.getId(),
-                "userId",       order.getUserId(),
-                "status",       order.getStatus().name(),
-                "paymentState", paymentState,
-                "totalAmount",  order.getTotalAmount().toString(),
-                "createdAt",    order.getCreatedAt().toString(),
-                "items",        items));
-            outboxRepository.save(new OutboxEvent(orderExchange, orderRoutingKey, payload));
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("orderId", order.getId());
+            payload.put("userId", order.getUserId());
+            payload.put("recipientEmail", resolveRecipientEmail(order));
+            payload.put("status", order.getStatus().name());
+            payload.put("paymentState", paymentState);
+            payload.put("totalAmount", order.getTotalAmount().toString());
+            payload.put("createdAt", order.getCreatedAt().toString());
+            payload.put("guestCheckout", order.isGuestCheckout());
+            payload.put("customerEmail", order.getCustomerEmail());
+            payload.put("customerFirstName", order.getCustomerFirstName());
+            payload.put("customerLastName", order.getCustomerLastName());
+            payload.put("shippingStreetAddress", order.getShippingStreetAddress());
+            payload.put("shippingCity", order.getShippingCity());
+            payload.put("shippingState", order.getShippingState());
+            payload.put("shippingPostalCode", order.getShippingPostalCode());
+            payload.put("shippingCountry", order.getShippingCountry());
+            payload.put("items", items);
+            outboxRepository.save(new OutboxEvent(orderExchange, orderRoutingKey, objectMapper.writeValueAsString(payload)));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize order event", e);
         }
+    }
+
+    private Map<String, Object> toItemPayload(OrderItem item) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("productId", item.getProductId());
+        payload.put("productName", item.getProductName());
+        payload.put("quantity", item.getQuantity());
+        payload.put("unitPrice", item.getUnitPrice().toString());
+        payload.put("lineTotal", item.getUnitPrice()
+            .multiply(BigDecimal.valueOf(item.getQuantity()))
+            .toString());
+        return payload;
+    }
+
+    private String resolveRecipientEmail(CustomerOrder order) {
+        String candidate = order.getCustomerEmail();
+        if (candidate != null && !candidate.isBlank()) {
+            return candidate;
+        }
+        return order.getUserId();
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.US);
     }
 
     private String resolvePaymentMethod(String paymentIntentId) {

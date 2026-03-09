@@ -1,14 +1,13 @@
 import axios from "axios";
 import { useState } from "react";
 import { paymentApi } from "../../services/api";
-import { getAuthToken, getCurrentUserId } from "../../utils/auth";
+import { getAuthSession } from "../../utils/auth";
 
-// Paystack inline.js types
 type PaystackPopSetup = {
   key: string;
   email: string;
-  amount: number;       // in kobo (NGN × 100)
-  accessCode?: string;  // use pre-initialized access code from backend
+  amount: number;
+  accessCode?: string;
   ref?: string;
   onClose: () => void;
   callback: (response: { reference: string }) => unknown;
@@ -48,16 +47,29 @@ type Props = {
   onSuccess: (reference: string) => Promise<void>;
   onError: (message: string) => void;
   disabled?: boolean;
+  email?: string;
+  token?: string;
+  buttonLabel?: string;
 };
 
-export default function PaystackCheckoutButton({ amountNgn, onSuccess, onError, disabled }: Props) {
+export default function PaystackCheckoutButton({
+  amountNgn,
+  onSuccess,
+  onError,
+  disabled,
+  email,
+  token,
+  buttonLabel,
+}: Props) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
-    const token = getAuthToken();
-    const email = getCurrentUserId(); // JWT sub = user email
-    if (!token || !email) {
-      onError("Please log in to checkout with Paystack.");
+    const session = getAuthSession();
+    const resolvedToken = token ?? session.token ?? undefined;
+    const resolvedEmail = email ?? session.email;
+
+    if (!resolvedEmail) {
+      onError("Please provide an email address before starting payment.");
       return;
     }
 
@@ -65,23 +77,21 @@ export default function PaystackCheckoutButton({ amountNgn, onSuccess, onError, 
     try {
       await loadPaystackScript();
 
-      const init = await paymentApi.initializePaystack(token, {
-        email,
+      const init = await paymentApi.initializePaystack(resolvedToken, {
+        email: resolvedEmail,
         amount: Number(amountNgn.toFixed(2)),
         currency: "NGN",
       });
 
       const handler = window.PaystackPop.setup({
         key: init.publicKey,
-        email,
-        amount: Math.round(amountNgn * 100), // kobo
+        email: resolvedEmail,
+        amount: Math.round(amountNgn * 100),
         accessCode: init.accessCode,
         onClose: () => {
           setLoading(false);
           onError("Payment popup was closed before completion.");
         },
-        // Must be a plain (non-async) function — Paystack's SDK rejects AsyncFunction
-        // instances. We hand off to the async onSuccess chain and reset loading in .finally().
         callback: (response: { reference: string }) => {
           onSuccess(response.reference).finally(() => setLoading(false));
         },
@@ -89,8 +99,6 @@ export default function PaystackCheckoutButton({ amountNgn, onSuccess, onError, 
 
       handler.openIframe();
     } catch (error) {
-      // Prefer the backend's own message (e.g. "Paystack gateway is not configured…")
-      // over Axios's generic "Request failed with status code 503"
       const backendMessage =
         axios.isAxiosError(error) && typeof error.response?.data?.message === "string"
           ? error.response.data.message
@@ -110,7 +118,7 @@ export default function PaystackCheckoutButton({ amountNgn, onSuccess, onError, 
       onClick={handleClick}
       type="button"
     >
-      {loading ? "Opening Paystack..." : "Pay with Paystack ₦"}
+      {loading ? "Opening Paystack..." : buttonLabel ?? "Pay with Paystack"}
     </button>
   );
 }

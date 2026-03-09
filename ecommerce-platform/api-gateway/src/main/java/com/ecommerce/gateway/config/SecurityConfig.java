@@ -34,6 +34,8 @@ public class SecurityConfig {
                 .pathMatchers("/actuator/**", "/fallback/**").permitAll()
                 .pathMatchers("/api/v1/auth/**").permitAll()
                 .pathMatchers("/api/v1/products", "/api/v1/products/**").permitAll()
+                .pathMatchers("/api/v1/orders/guest").permitAll()
+                .pathMatchers("/api/v1/payments/paystack/initialize").permitAll()
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
                 .anyExchange().authenticated())
             .exceptionHandling(exceptionHandling -> exceptionHandling

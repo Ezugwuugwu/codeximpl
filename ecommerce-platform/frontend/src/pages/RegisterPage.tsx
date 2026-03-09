@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "../services/api";
 import { buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
+import { hasGuestCartItems } from "../utils/guestCart";
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ function RegisterPage() {
         ? "Create an account or sign in first to continue to checkout."
         : "Create an account or sign in first to add items to your cart."
       : "";
+  const guestCheckoutAvailable = hasGuestCartItems();
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -88,6 +90,15 @@ function RegisterPage() {
         <h2 className="mb-1 text-2xl font-semibold">Create an account</h2>
         <p className="mb-6 text-sm text-slate-500">Create your account and start shopping.</p>
         {authPrompt && <p className="mb-4 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-800">{authPrompt}</p>}
+        {guestCheckoutAvailable && (
+          <Link
+            className="mb-4 flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-amber-100"
+            to="/guest-checkout"
+          >
+            <span>Continue as guest checkout</span>
+            <span aria-hidden="true">→</span>
+          </Link>
+        )}
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">

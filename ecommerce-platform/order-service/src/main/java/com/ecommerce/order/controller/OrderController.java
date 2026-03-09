@@ -3,6 +3,7 @@ package com.ecommerce.order.controller;
 import com.ecommerce.order.domain.CustomerOrder;
 import com.ecommerce.order.domain.OrderStatus;
 import com.ecommerce.order.service.OrderProcessingService;
+import com.ecommerce.order.service.dto.CreateGuestOrderRequest;
 import com.ecommerce.order.service.dto.CreateOrderRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -37,6 +38,11 @@ public class OrderController {
     public ResponseEntity<CustomerOrder> create(@AuthenticationPrincipal Jwt jwt,
                                                 @Valid @RequestBody CreateOrderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.createOrder(jwt.getSubject(), request));
+    }
+
+    @PostMapping("/guest")
+    public ResponseEntity<CustomerOrder> createGuest(@Valid @RequestBody CreateGuestOrderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createGuestOrder(request));
     }
 
     @GetMapping

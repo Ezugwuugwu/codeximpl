@@ -6,6 +6,7 @@ import { productApi } from "../services/api";
 import type { Product } from "../types";
 import { buildAuthEntryPath, getAuthSession } from "../utils/auth";
 import { cacheProducts, readCatalogCache, writeCatalogCache } from "../utils/productCache";
+import { addGuestCartProduct } from "../utils/guestCart";
 
 type HeroTile = {
   title: string;
@@ -319,6 +320,7 @@ function StorePage() {
 
   const onAddToCart = async (product: Product, quantity: number) => {
     if (!getAuthSession().isAuthenticated) {
+      addGuestCartProduct(product, quantity);
       navigate(buildAuthEntryPath("login", `${location.pathname}${location.search}${location.hash}`, "cart"));
       return;
     }

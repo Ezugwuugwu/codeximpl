@@ -27,6 +27,33 @@ public class CustomerOrder {
     @Column(nullable = false)
     private String userId;
 
+    @Column(nullable = false)
+    private boolean guestCheckout = false;
+
+    @Column(length = 255)
+    private String customerEmail;
+
+    @Column(length = 120)
+    private String customerFirstName;
+
+    @Column(length = 120)
+    private String customerLastName;
+
+    @Column(length = 255)
+    private String shippingStreetAddress;
+
+    @Column(length = 120)
+    private String shippingCity;
+
+    @Column(length = 120)
+    private String shippingState;
+
+    @Column(length = 40)
+    private String shippingPostalCode;
+
+    @Column(length = 120)
+    private String shippingCountry;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.CREATED;
@@ -50,6 +77,78 @@ public class CustomerOrder {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    public boolean isGuestCheckout() {
+        return guestCheckout;
+    }
+
+    public void setGuestCheckout(boolean guestCheckout) {
+        this.guestCheckout = guestCheckout;
+    }
+
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
+    }
+
+    public String getCustomerFirstName() {
+        return customerFirstName;
+    }
+
+    public void setCustomerFirstName(String customerFirstName) {
+        this.customerFirstName = customerFirstName;
+    }
+
+    public String getCustomerLastName() {
+        return customerLastName;
+    }
+
+    public void setCustomerLastName(String customerLastName) {
+        this.customerLastName = customerLastName;
+    }
+
+    public String getShippingStreetAddress() {
+        return shippingStreetAddress;
+    }
+
+    public void setShippingStreetAddress(String shippingStreetAddress) {
+        this.shippingStreetAddress = shippingStreetAddress;
+    }
+
+    public String getShippingCity() {
+        return shippingCity;
+    }
+
+    public void setShippingCity(String shippingCity) {
+        this.shippingCity = shippingCity;
+    }
+
+    public String getShippingState() {
+        return shippingState;
+    }
+
+    public void setShippingState(String shippingState) {
+        this.shippingState = shippingState;
+    }
+
+    public String getShippingPostalCode() {
+        return shippingPostalCode;
+    }
+
+    public void setShippingPostalCode(String shippingPostalCode) {
+        this.shippingPostalCode = shippingPostalCode;
+    }
+
+    public String getShippingCountry() {
+        return shippingCountry;
+    }
+
+    public void setShippingCountry(String shippingCountry) {
+        this.shippingCountry = shippingCountry;
     }
 
     public OrderStatus getStatus() {

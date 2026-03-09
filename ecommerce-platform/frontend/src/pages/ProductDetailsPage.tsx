@@ -8,6 +8,7 @@ import RatingDisplay from "../components/RatingDisplay";
 import { getProductRating, getProductReviewCount } from "../utils/productPresentation";
 import { cacheProduct, readCachedProduct } from "../utils/productCache";
 import { buildAuthEntryPath, getAuthSession } from "../utils/auth";
+import { addGuestCartProduct, replaceGuestCartWithProduct } from "../utils/guestCart";
 
 const fallbackImage = "https://picsum.photos/seed/product-fallback/1000/700";
 
@@ -104,6 +105,7 @@ function ProductDetailsPage() {
       return;
     }
     if (!getAuthSession().isAuthenticated) {
+      addGuestCartProduct(product, quantity);
       navigate(buildAuthEntryPath("login", authRedirectTarget, "cart"));
       return;
     }
@@ -126,6 +128,7 @@ function ProductDetailsPage() {
       return;
     }
     if (!getAuthSession().isAuthenticated) {
+      replaceGuestCartWithProduct(product, quantity);
       navigate(buildAuthEntryPath("login", authRedirectTarget, "checkout"));
       return;
     }
@@ -146,6 +149,7 @@ function ProductDetailsPage() {
       return;
     }
     if (!getAuthSession().isAuthenticated) {
+      replaceGuestCartWithProduct(product, quantity);
       navigate(buildAuthEntryPath("login", authRedirectTarget, "cart"));
       return;
     }

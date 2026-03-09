@@ -39,7 +39,7 @@ public class CommerceEventListener {
 
     @RabbitListener(queues = "order.events")
     public void onOrderEvent(Map<String, Object> payload) {
-        String recipient = payload.getOrDefault("userId", "").toString();
+        String recipient = readRecipient(payload);
         String orderId = payload.getOrDefault("orderId", "N/A").toString();
         String status = payload.getOrDefault("status", "UNKNOWN").toString();
 
@@ -161,5 +161,14 @@ public class CommerceEventListener {
         }
         String normalized = value.toString();
         return normalized.isBlank() ? fallback : normalized;
+    }
+
+    private static String readRecipient(Map<String, Object> payload) {
+        Object candidate = payload.get("recipientEmail");
+        if (candidate != null && !candidate.toString().isBlank()) {
+            return candidate.toString();
+        }
+        Object fallback = payload.get("userId");
+        return fallback == null ? "" : fallback.toString();
     }
 }

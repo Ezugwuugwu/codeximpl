@@ -47,6 +47,15 @@ export type CustomerOrder = {
   status: string;
   totalAmount: number;
   createdAt: string;
+  guestCheckout?: boolean;
+  customerEmail?: string;
+  customerFirstName?: string;
+  customerLastName?: string;
+  shippingStreetAddress?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingPostalCode?: string;
+  shippingCountry?: string;
   items: OrderItem[];
 };
 
@@ -145,6 +154,28 @@ export type CreateOrderRequest = {
     quantity: number;
     unitPrice: number;
   }>;
+  paymentIntentId?: string;
+};
+
+export type GuestOrderCustomer = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+};
+
+export type CreateGuestOrderRequest = {
+  items: Array<{
+    productId: number;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  customer: GuestOrderCustomer;
   paymentIntentId?: string;
 };
 

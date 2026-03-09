@@ -3,6 +3,7 @@ import type {
   AnalyticsOverview,
   AuthResponse,
   Cart,
+  CreateGuestOrderRequest,
   CreateOrderRequest,
   CustomerOrder,
   NotificationPreferences,
@@ -258,12 +259,17 @@ export const orderApi = {
     });
     return data;
   },
+
+  async createGuest(payload: CreateGuestOrderRequest): Promise<CustomerOrder> {
+    const { data } = await api.post<CustomerOrder>("/api/v1/orders/guest", payload);
+    return data;
+  },
 };
 
 export const paymentApi = {
-  async initializePaystack(token: string, payload: PaystackInitializeRequest): Promise<PaystackInitializeResponse> {
+  async initializePaystack(token: string | undefined, payload: PaystackInitializeRequest): Promise<PaystackInitializeResponse> {
     const { data } = await api.post<PaystackInitializeResponse>("/api/v1/payments/paystack/initialize", payload, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     return data;
   },

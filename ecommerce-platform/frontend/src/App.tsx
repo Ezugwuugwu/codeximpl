@@ -13,6 +13,7 @@ import ProductDetailsPage from "./pages/ProductDetailsPage";
 import ContactPage from "./pages/ContactPage";
 import SettingsPage from "./pages/SettingsPage";
 import AboutPage from "./pages/AboutPage";
+import GuestCheckoutPage from "./pages/GuestCheckoutPage";
 import SiteFooter from "./components/layout/SiteFooter";
 import type { LiveAgentSession } from "./types/support";
 import type { UserProfile } from "./types";
@@ -353,6 +354,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify-otp" element={<OtpVerificationPage />} />
+          <Route path="/guest-checkout" element={<GuestCheckoutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/about" element={<AboutPage />} />
         </Routes>

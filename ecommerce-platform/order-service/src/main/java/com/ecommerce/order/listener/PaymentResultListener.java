@@ -82,10 +82,20 @@ public class PaymentResultListener {
             Map<String, Object> eventPayload = new LinkedHashMap<>();
             eventPayload.put("orderId", order.getId());
             eventPayload.put("userId", order.getUserId());
+            eventPayload.put("recipientEmail", resolveRecipientEmail(order));
             eventPayload.put("status", order.getStatus().name());
             eventPayload.put("paymentState", paymentStatus);
             eventPayload.put("totalAmount", order.getTotalAmount().toString());
             eventPayload.put("createdAt", order.getCreatedAt().toString());
+            eventPayload.put("guestCheckout", order.isGuestCheckout());
+            eventPayload.put("customerEmail", order.getCustomerEmail());
+            eventPayload.put("customerFirstName", order.getCustomerFirstName());
+            eventPayload.put("customerLastName", order.getCustomerLastName());
+            eventPayload.put("shippingStreetAddress", order.getShippingStreetAddress());
+            eventPayload.put("shippingCity", order.getShippingCity());
+            eventPayload.put("shippingState", order.getShippingState());
+            eventPayload.put("shippingPostalCode", order.getShippingPostalCode());
+            eventPayload.put("shippingCountry", order.getShippingCountry());
             eventPayload.put("items", items);
             String outboxPayload = objectMapper.writeValueAsString(eventPayload);
             outboxRepository.save(new OutboxEvent(orderExchange, orderRoutingKey, outboxPayload));
@@ -104,5 +114,13 @@ public class PaymentResultListener {
             .multiply(BigDecimal.valueOf(item.getQuantity()))
             .toString());
         return payload;
+    }
+
+    private String resolveRecipientEmail(CustomerOrder order) {
+        String email = order.getCustomerEmail();
+        if (email != null && !email.isBlank()) {
+            return email;
+        }
+        return order.getUserId();
     }
 }
