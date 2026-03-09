@@ -15,11 +15,11 @@ const footerColumns: FooterColumn[] = [
   {
     title: "About Okanga Mart",
     links: [
-      { label: "Who We Are", to: "/" },
-      { label: "Community Promise", to: "/" },
-      { label: "Product Quality Standards", to: "/" },
-      { label: "Careers", to: "/" },
-      { label: "Partnerships", to: "/" },
+      { label: "Who We Are", to: "/about?section=who-we-are" },
+      { label: "Community Promise", to: "/about?section=community-promise" },
+      { label: "Product Quality Standards", to: "/about?section=product-quality-standards" },
+      { label: "Careers", to: "/about?section=careers" },
+      { label: "Partnerships", to: "/about?section=partnerships" },
     ],
   },
   {
@@ -89,7 +89,9 @@ function SiteFooter() {
       </div>
 
       <div className="border-t border-slate-600/70 px-6 py-4 text-center text-xs text-slate-300">
-        Okanga Mart © {new Date().getFullYear()} • Trusted marketplace for fashion, audio, and smart lifestyle products.
+        {"Okanga Mart \u00a9 "}
+        {new Date().getFullYear()}
+        {" \u2022 Trusted marketplace for fashion, audio, and smart lifestyle products."}
       </div>
     </footer>
   );
