@@ -21,3 +21,5 @@ app:
   mail:
     from-address: ${MAIL_FROM_ADDRESS:${SMTP_USERNAME:support@okangamart.com}}
     from-name: ${MAIL_FROM_NAME:Okanga Mart}
+  user-service:
+    base-url: ${USER_SERVICE_URL:http://localhost:8081}
