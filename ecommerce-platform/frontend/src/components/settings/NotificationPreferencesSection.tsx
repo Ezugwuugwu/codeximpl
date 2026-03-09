@@ -118,9 +118,9 @@ function NotificationPreferencesSection({ token }: NotificationPreferencesSectio
               onChange={(event) => updatePreference("orderUpdatesEnabled", event.target.checked)}
             />
             <span>
-              <span className="block text-sm font-semibold text-slate-900">Order updates</span>
+              <span className="block text-sm font-semibold text-slate-900">Payment confirmations</span>
               <span className="mt-1 block text-sm leading-6 text-slate-600">
-                Send email updates when orders are placed, paid, shipped, or delivered.
+                Email me when a payment succeeds so I can review the confirmed order details.
               </span>
             </span>
           </label>

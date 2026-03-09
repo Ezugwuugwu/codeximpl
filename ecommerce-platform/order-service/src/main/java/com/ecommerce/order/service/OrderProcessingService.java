@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -126,6 +127,7 @@ public class OrderProcessingService {
             if (response != null && "APPROVED".equalsIgnoreCase(response.status())) {
                 order.setStatus(OrderStatus.PAID);
                 repository.save(order);
+                saveToOutbox(order, response.status());
                 log.info("Paystack payment verified for order {}", order.getId());
             } else {
                 String status = response != null ? response.status() : "null";
@@ -156,13 +158,27 @@ public class OrderProcessingService {
 
     private void saveToOutbox(CustomerOrder order, String paymentState) {
         try {
+            List<Map<String, Object>> items = order.getItems().stream()
+                .map(item -> {
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put("productId", item.getProductId());
+                    payload.put("productName", item.getProductName());
+                    payload.put("quantity", item.getQuantity());
+                    payload.put("unitPrice", item.getUnitPrice().toString());
+                    payload.put("lineTotal", item.getUnitPrice()
+                        .multiply(BigDecimal.valueOf(item.getQuantity()))
+                        .toString());
+                    return payload;
+                })
+                .toList();
             String payload = objectMapper.writeValueAsString(Map.of(
                 "orderId",      order.getId(),
                 "userId",       order.getUserId(),
                 "status",       order.getStatus().name(),
                 "paymentState", paymentState,
                 "totalAmount",  order.getTotalAmount().toString(),
-                "createdAt",    order.getCreatedAt().toString()));
+                "createdAt",    order.getCreatedAt().toString(),
+                "items",        items));
             outboxRepository.save(new OutboxEvent(orderExchange, orderRoutingKey, payload));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize order event", e);
