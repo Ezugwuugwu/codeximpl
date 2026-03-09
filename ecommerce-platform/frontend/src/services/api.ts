@@ -127,6 +127,15 @@ export const userApi = {
     return data;
   },
 
+  async setDefaultAddress(token: string, id: number): Promise<UserAddress> {
+    const { data } = await api.put<UserAddress>(`/api/v1/users/me/addresses/${id}/default`, undefined, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
   async deleteAddress(token: string, id: number): Promise<void> {
     await api.delete(`/api/v1/users/me/addresses/${id}`, {
       headers: {

@@ -5,24 +5,85 @@ import { userApi } from "../services/api";
 import type { UserProfile } from "../types";
 import { clearAuthToken, getAuthSession } from "../utils/auth";
 
+type SettingsIconProps = {
+  className?: string;
+};
+
+function ProfileIcon({ className = "h-5 w-5" }: SettingsIconProps) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
+      <path
+        d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.87 0-7 1.79-7 4v1h14v-1c0-2.21-3.13-4-7-4Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function LockIcon({ className = "h-5 w-5" }: SettingsIconProps) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
+      <path
+        d="M8 10V7a4 4 0 1 1 8 0v3m-9 0h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function AddressIcon({ className = "h-5 w-5" }: SettingsIconProps) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
+      <path
+        d="M12 21s6-5.33 6-11a6 6 0 1 0-12 0c0 5.67 6 11 6 11Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className = "h-4 w-4" }: SettingsIconProps) {
+  return (
+    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
+      <path d="m9 6 6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 const settingsNavigation = [
   {
     key: "profile",
     label: "Profile info",
-    description: "Update the name and account details shown across your profile.",
+    description: "Update your name and core account details.",
     targetId: "profile-section",
+    focusId: "settings-first-name",
+    Icon: ProfileIcon,
   },
   {
     key: "security",
     label: "Change password",
-    description: "Rotate your password without mixing security changes into profile edits.",
+    description: "Change your sign-in password securely.",
     targetId: "security-section",
+    focusId: "settings-current-password",
+    Icon: LockIcon,
   },
   {
     key: "addresses",
     label: "Address management",
-    description: "Add, edit, and choose the delivery addresses your orders should use.",
+    description: "Add or choose the delivery address your orders should use.",
     targetId: "address-section",
+    focusId: "address-label",
+    Icon: AddressIcon,
   },
 ];
 
@@ -149,14 +210,25 @@ function SettingsPage() {
     target.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const onNavigationClick = (key: string, targetId: string) => {
+  const focusField = (fieldId: string, delay = 0) => {
+    window.setTimeout(() => {
+      const target = document.getElementById(fieldId);
+      if (target instanceof HTMLElement) {
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, delay);
+  };
+
+  const onNavigationClick = (key: string, targetId: string, focusId: string) => {
     if (key === "addresses") {
       setAddressCreateRequestToken((current) => current + 1);
       window.requestAnimationFrame(() => scrollToSection(targetId));
+      focusField(focusId, 140);
       return;
     }
 
-    scrollToSection(targetId);
+    focusField(focusId);
   };
 
   const onSubmit = async (event: FormEvent) => {
@@ -262,12 +334,20 @@ function SettingsPage() {
           {settingsNavigation.map((item) => (
             <button
               key={item.key}
-              className="block w-full rounded-3xl border border-[#f5c955] bg-[#fff8dd] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-[#fff4c4]"
+              className="flex w-full items-start gap-3 rounded-[28px] border border-[#f5c955] bg-[#fff8dd] px-4 py-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-[#fff4c4]"
               type="button"
-              onClick={() => onNavigationClick(item.key, item.targetId)}
+              onClick={() => onNavigationClick(item.key, item.targetId, item.focusId)}
             >
-              <p className="text-2xl font-semibold text-slate-900">{item.label}</p>
-              <p className="mt-3 max-w-xs text-sm leading-7 text-slate-500">{item.description}</p>
+              <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+                <item.Icon />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-semibold text-slate-900">{item.label}</span>
+                <span className="mt-1 block max-w-[16rem] text-sm leading-6 text-slate-600">{item.description}</span>
+              </span>
+              <span className="mt-1 shrink-0 rounded-full border border-slate-200 bg-white p-2 text-slate-600">
+                <ChevronIcon />
+              </span>
             </button>
           ))}
         </div>

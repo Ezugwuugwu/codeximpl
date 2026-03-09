@@ -72,6 +72,18 @@ public class UserAddressService {
     }
 
     @Transactional
+    public UserAddressResponse setCurrentUserDefaultAddress(AppUser authenticatedUser, Long addressId) {
+        AppUser user = currentUserService.requireCurrentUser(authenticatedUser);
+        UserAddress address = getOwnedAddress(user.getId(), addressId);
+        address.setDefaultAddress(true);
+        UserAddress saved = userAddressRepository.save(address);
+        clearDefaultFlagFromOtherAddresses(user.getId(), saved.getId());
+        ensureOneDefaultAddress(user.getId());
+        syncLegacyPrimaryAddress(user);
+        return UserAddressResponse.from(saved);
+    }
+
+    @Transactional
     public void deleteCurrentUserAddress(AppUser authenticatedUser, Long addressId) {
         AppUser user = currentUserService.requireCurrentUser(authenticatedUser);
         UserAddress address = getOwnedAddress(user.getId(), addressId);

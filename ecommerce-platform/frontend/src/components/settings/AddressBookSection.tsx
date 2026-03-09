@@ -42,6 +42,16 @@ function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 
     [addresses, editingAddressId]
   );
 
+  const focusAddressForm = () => {
+    window.setTimeout(() => {
+      const target = document.getElementById("address-label");
+      if (target instanceof HTMLElement) {
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 120);
+  };
+
   const loadAddresses = async () => {
     setLoading(true);
     setError("");
@@ -96,6 +106,7 @@ function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 
   useEffect(() => {
     if (createRequestToken > 0) {
       openCreateForm();
+      focusAddressForm();
     }
   }, [createRequestToken]);
 
@@ -151,15 +162,7 @@ function AddressBookSection({ token, onAddressesChanged, createRequestToken = 0 
     setSuccess("");
     setSaving(true);
     try {
-      await userApi.updateAddress(token, address.id, {
-        label: address.label,
-        streetAddress: address.streetAddress,
-        city: address.city,
-        state: address.state,
-        postalCode: address.postalCode,
-        country: address.country,
-        defaultAddress: true,
-      });
+      await userApi.setDefaultAddress(token, address.id);
       setSuccess(`"${address.label}" is now your default delivery address.`);
       await loadAddresses();
       await onAddressesChanged?.();

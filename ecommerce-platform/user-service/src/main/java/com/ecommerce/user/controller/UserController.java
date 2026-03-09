@@ -74,9 +74,15 @@ public class UserController {
 
     @PutMapping("/me/addresses/{addressId}")
     public ResponseEntity<UserAddressResponse> updateCurrentUserAddress(@AuthenticationPrincipal AppUser user,
-                                                                        @PathVariable Long addressId,
-                                                                        @Valid @RequestBody UpsertUserAddressRequest request) {
+                                                                         @PathVariable Long addressId,
+                                                                         @Valid @RequestBody UpsertUserAddressRequest request) {
         return ResponseEntity.ok(userAddressService.updateCurrentUserAddress(user, addressId, request));
+    }
+
+    @PutMapping("/me/addresses/{addressId}/default")
+    public ResponseEntity<UserAddressResponse> setCurrentUserDefaultAddress(@AuthenticationPrincipal AppUser user,
+                                                                            @PathVariable Long addressId) {
+        return ResponseEntity.ok(userAddressService.setCurrentUserDefaultAddress(user, addressId));
     }
 
     @DeleteMapping("/me/addresses/{addressId}")
