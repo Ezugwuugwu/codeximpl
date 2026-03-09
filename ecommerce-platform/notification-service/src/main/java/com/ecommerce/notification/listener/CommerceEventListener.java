@@ -40,16 +40,26 @@ public class CommerceEventListener {
     @RabbitListener(queues = "order.events")
     public void onOrderEvent(Map<String, Object> payload) {
         String recipient = payload.getOrDefault("userId", "").toString();
-        if (recipient.isBlank() || !userNotificationPreferencesClient.allowsOrderUpdates(recipient)) {
-            return;
-        }
-
-        String status = payload.getOrDefault("status", "UNKNOWN").toString();
-        if (!"PAID".equalsIgnoreCase(status)) {
-            return;
-        }
-
         String orderId = payload.getOrDefault("orderId", "N/A").toString();
+        String status = payload.getOrDefault("status", "UNKNOWN").toString();
+
+        LOGGER.info("Consumed order event for order {} with status {} and recipient {}", orderId, status, recipient);
+
+        if (recipient.isBlank()) {
+            LOGGER.warn("Skipping order event for order {} because recipient is blank.", orderId);
+            return;
+        }
+
+        if (!"PAID".equalsIgnoreCase(status)) {
+            LOGGER.info("Skipping order event for order {} because status {} does not require a customer email.", orderId, status);
+            return;
+        }
+
+        if (!userNotificationPreferencesClient.allowsOrderUpdates(recipient)) {
+            LOGGER.info("Skipping paid-order email for {} because payment confirmations are disabled.", recipient);
+            return;
+        }
+
         String totalAmount = payload.getOrDefault("totalAmount", "0.00").toString();
         String createdAt = payload.getOrDefault("createdAt", "").toString();
         String paymentState = payload.getOrDefault("paymentState", "APPROVED").toString();
