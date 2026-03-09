@@ -70,6 +70,53 @@ export type RegisterResponse = {
   email: string;
 };
 
+export type UserProfile = {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  address: string;
+  role: "USER" | "ADMIN";
+  emailVerified: boolean;
+  createdAt: string;
+};
+
+export type UserProfileUpdateRequest = {
+  firstName: string;
+  lastName: string;
+};
+
+export type PasswordChangeRequest = {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+};
+
+export type UserAddress = {
+  id: number;
+  label: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  defaultAddress: boolean;
+  complete: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserAddressUpsertRequest = {
+  label: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  defaultAddress: boolean;
+};
+
 export type CartItem = {
   productId: number;
   productName: string;

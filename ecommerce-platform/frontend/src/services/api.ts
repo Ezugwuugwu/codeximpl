@@ -6,13 +6,19 @@ import type {
   CreateOrderRequest,
   CustomerOrder,
   PagedResponse,
+  PasswordChangeRequest,
   PaystackInitializeRequest,
   PaystackInitializeResponse,
   Product,
   ProductCreateRequest,
   ProductUpdateRequest,
   RegisterResponse,
+  UserProfile,
+  UserAddress,
+  UserAddressUpsertRequest,
+  UserProfileUpdateRequest,
 } from "../types";
+import { clearAuthToken } from "../utils/auth";
 
 const api = axios.create({
   // Prefer same-origin calls via Vite proxy to avoid browser CORS/network issues.
@@ -30,8 +36,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retried && localStorage.getItem("auth_token")) {
       originalRequest._retried = true;
-      localStorage.removeItem("auth_token");
-      window.dispatchEvent(new Event("auth-changed"));
+      clearAuthToken();
       delete (originalRequest.headers as Record<string, unknown>)["Authorization"];
       return api(originalRequest);
     }
@@ -64,6 +69,70 @@ export const authApi = {
   async login(email: string, password: string): Promise<AuthResponse> {
     const { data } = await api.post<AuthResponse>("/api/v1/auth/login", { email, password });
     return data;
+  },
+};
+
+export const userApi = {
+  async getMe(token: string): Promise<UserProfile> {
+    const { data } = await api.get<UserProfile>("/api/users/me", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async updateMe(token: string, payload: UserProfileUpdateRequest): Promise<UserProfile> {
+    const { data } = await api.put<UserProfile>("/api/users/me", payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async changePassword(token: string, payload: PasswordChangeRequest): Promise<{ message: string }> {
+    const { data } = await api.put<{ message: string }>("/api/users/me/password", payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async listAddresses(token: string): Promise<UserAddress[]> {
+    const { data } = await api.get<UserAddress[]>("/api/users/me/addresses", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async createAddress(token: string, payload: UserAddressUpsertRequest): Promise<UserAddress> {
+    const { data } = await api.post<UserAddress>("/api/users/me/addresses", payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async updateAddress(token: string, id: number, payload: UserAddressUpsertRequest): Promise<UserAddress> {
+    const { data } = await api.put<UserAddress>(`/api/users/me/addresses/${id}`, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return data;
+  },
+
+  async deleteAddress(token: string, id: number): Promise<void> {
+    await api.delete(`/api/users/me/addresses/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
   },
 };
 

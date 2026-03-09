@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "./context/CartContext";
-import { productApi } from "./services/api";
+import { productApi, userApi } from "./services/api";
 import { supportService } from "./services/supportService";
 import StorePage from "./pages/StorePage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
@@ -11,32 +11,27 @@ import RegisterPage from "./pages/RegisterPage";
 import OtpVerificationPage from "./pages/OtpVerificationPage";
 import ProductDetailsPage from "./pages/ProductDetailsPage";
 import ContactPage from "./pages/ContactPage";
+import SettingsPage from "./pages/SettingsPage";
 import SiteFooter from "./components/layout/SiteFooter";
 import type { LiveAgentSession } from "./types/support";
+import type { UserProfile } from "./types";
+import { clearAuthToken, getAuthSession } from "./utils/auth";
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const { cartCount } = useCart();
+  const [authSession, setAuthSession] = useState(() => getAuthSession());
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [liveAgentUnread, setLiveAgentUnread] = useState(0);
   const [supportNotificationCount, setSupportNotificationCount] = useState(0);
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
-  const token = localStorage.getItem("auth_token");
-  const isAuthenticated = Boolean(token);
-  let userEmail: string | null = null;
-  let userName: string | null = null;
-  let isAdmin = false;
-  if (token) {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      userEmail = payload.sub ?? null;
-      userName = payload.name ?? payload.fullName ?? payload.given_name ?? null;
-      isAdmin = payload.role === "ADMIN";
-    } catch {
-      // ignore malformed token
-    }
-  }
+  const token = authSession.token || undefined;
+  const isAuthenticated = authSession.isAuthenticated;
+  const userEmail = currentUserProfile?.email || authSession.email || null;
+  const userName = currentUserProfile?.fullName || authSession.displayName || null;
+  const isAdmin = (currentUserProfile?.role ?? authSession.role) === "ADMIN";
   const normalizedCategories = useMemo(
     () => categories.map((category) => category.trim()).filter((category) => category.length > 0),
     [categories]
@@ -52,6 +47,63 @@ function App() {
       .replace(/\b\w/g, (match) => match.toUpperCase());
   }, [userName, userEmail]);
   const accountEmail = userEmail ?? "No account signed in";
+
+  useEffect(() => {
+    const syncAuthSession = () => setAuthSession(getAuthSession());
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === "auth_token") {
+        syncAuthSession();
+      }
+    };
+
+    window.addEventListener("auth-changed", syncAuthSession);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("auth-changed", syncAuthSession);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onProfileUpdated = (event: Event) => {
+      const profile = (event as CustomEvent<UserProfile>).detail;
+      if (profile) {
+        setCurrentUserProfile(profile);
+      }
+    };
+
+    window.addEventListener("profile-updated", onProfileUpdated as EventListener);
+    return () => window.removeEventListener("profile-updated", onProfileUpdated as EventListener);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!token) {
+      setCurrentUserProfile(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const loadCurrentProfile = async () => {
+      try {
+        const profile = await userApi.getMe(token);
+        if (!cancelled) {
+          setCurrentUserProfile(profile);
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentUserProfile(null);
+        }
+      }
+    };
+
+    loadCurrentProfile().catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const buildStoreLink = (category?: string) => {
     const params = new URLSearchParams(location.search);
@@ -173,8 +225,8 @@ function App() {
   }, [location.pathname, location.search]);
 
   const logout = () => {
-    localStorage.removeItem("auth_token");
-    window.dispatchEvent(new Event("auth-changed"));
+    clearAuthToken();
+    setCurrentUserProfile(null);
     navigate("/login");
   };
 
@@ -292,6 +344,7 @@ function App() {
           <Route path="/products/:productId" element={<ProductDetailsPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify-otp" element={<OtpVerificationPage />} />
@@ -332,23 +385,25 @@ function App() {
               )}
             </Link>
           )}
-          <button
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            type="button"
-          >
-            Settings
-          </button>
           {isAuthenticated ? (
-            <button
-              className="w-full rounded-xl bg-slate-900 px-4 py-3 text-left text-sm font-medium text-white transition hover:bg-slate-800"
-              onClick={() => {
-                setIsAccountPanelOpen(false);
-                logout();
-              }}
-              type="button"
-            >
-              Logout
-            </button>
+            <>
+              <Link
+                className="block rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                to="/settings"
+              >
+                Settings
+              </Link>
+              <button
+                className="w-full rounded-xl bg-slate-900 px-4 py-3 text-left text-sm font-medium text-white transition hover:bg-slate-800"
+                onClick={() => {
+                  setIsAccountPanelOpen(false);
+                  logout();
+                }}
+                type="button"
+              >
+                Logout
+              </button>
+            </>
           ) : (
             <>
               <Link

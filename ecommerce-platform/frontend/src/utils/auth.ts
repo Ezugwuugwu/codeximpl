@@ -2,10 +2,24 @@ export function getAuthToken(): string {
   return localStorage.getItem("auth_token") || "";
 }
 
+export type AuthRole = "USER" | "ADMIN";
+
+export type AuthSession = {
+  token: string;
+  email: string;
+  displayName: string;
+  role: AuthRole | null;
+  isAuthenticated: boolean;
+  isAdmin: boolean;
+};
+
 type JwtPayload = {
   sub?: string;
   role?: string;
   exp?: number;
+  name?: string;
+  fullName?: string;
+  given_name?: string;
 };
 
 function decodeJwtPayload(token: string): JwtPayload | null {
@@ -15,20 +29,62 @@ function decodeJwtPayload(token: string): JwtPayload | null {
       return null;
     }
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const json = atob(normalized);
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const json = atob(padded);
     return JSON.parse(json) as JwtPayload;
   } catch {
     return null;
   }
 }
 
-export function getCurrentUserId(): string {
+export function getAuthSession(): AuthSession {
   const token = getAuthToken();
   if (!token) {
-    return "";
+    return {
+      token: "",
+      email: "",
+      displayName: "",
+      role: null,
+      isAuthenticated: false,
+      isAdmin: false,
+    };
   }
+
   const payload = decodeJwtPayload(token);
-  return typeof payload?.sub === "string" ? payload.sub : "";
+  const email = typeof payload?.sub === "string" ? payload.sub : "";
+  const displayName = typeof payload?.name === "string"
+    ? payload.name
+    : typeof payload?.fullName === "string"
+      ? payload.fullName
+      : typeof payload?.given_name === "string"
+        ? payload.given_name
+        : "";
+  const role = payload?.role === "ADMIN" || payload?.role === "USER"
+    ? payload.role
+    : null;
+
+  return {
+    token,
+    email,
+    displayName,
+    role,
+    isAuthenticated: Boolean(token),
+    isAdmin: role === "ADMIN",
+  };
+}
+
+export function setAuthToken(token: string): void {
+  localStorage.setItem("auth_token", token);
+  window.dispatchEvent(new Event("auth-changed"));
+}
+
+export function clearAuthToken(): void {
+  localStorage.removeItem("auth_token");
+  window.dispatchEvent(new Event("auth-changed"));
+}
+
+export function getCurrentUserId(): string {
+  return getAuthSession().email;
 }
 
 export function isTokenExpired(token: string): boolean {

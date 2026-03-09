@@ -27,17 +27,20 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final OtpService otpService;
+    private final UserAddressService userAddressService;
 
     public AuthService(AppUserRepository repository,
                        PasswordEncoder passwordEncoder,
                        AuthenticationManager authenticationManager,
                        JwtService jwtService,
-                       OtpService otpService) {
+                       OtpService otpService,
+                       UserAddressService userAddressService) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.otpService = otpService;
+        this.userAddressService = userAddressService;
     }
 
     @Transactional
@@ -54,12 +57,13 @@ public class AuthService {
             if (existingUser.isEnabled()) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
             }
-            // Unverified account — update details and resend OTP
+            // Unverified account: update details and resend OTP.
             existingUser.setPassword(passwordEncoder.encode(request.password()));
             existingUser.setFirstName(request.firstName().trim());
             existingUser.setLastName(request.lastName().trim());
             existingUser.setAddress(request.address().trim());
             repository.save(existingUser);
+            userAddressService.createOrUpdateRegistrationAddress(existingUser, request.address());
             otpService.generateAndSend(email);
             return new RegisterResponse("A verification code has been sent to your email.", email);
         }
@@ -72,7 +76,8 @@ public class AuthService {
         user.setAddress(request.address().trim());
         user.setRole(Role.USER);
         user.setEnabled(false);
-        repository.save(user);
+        AppUser savedUser = repository.save(user);
+        userAddressService.createOrUpdateRegistrationAddress(savedUser, request.address());
 
         otpService.generateAndSend(email);
 

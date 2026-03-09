@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { authApi } from "../services/api";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { setAuthToken } from "../utils/auth";
 
 function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,8 +15,7 @@ function LoginPage() {
     setError("");
     try {
       const response = await authApi.login(email, password);
-      localStorage.setItem("auth_token", response.token);
-      window.dispatchEvent(new Event("auth-changed"));
+      setAuthToken(response.token);
       navigate(response.role === "ADMIN" ? "/admin" : "/");
     } catch (err) {
       if (axios.isAxiosError(err)) {
