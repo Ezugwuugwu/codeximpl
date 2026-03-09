@@ -6,11 +6,6 @@ import { productApi } from "../services/api";
 import type { Product } from "../types";
 import { cacheProducts, readCatalogCache, writeCatalogCache } from "../utils/productCache";
 
-type CategoryGroup = {
-  name: string;
-  products: Product[];
-};
-
 type HeroTile = {
   title: string;
   category: string;
@@ -175,11 +170,11 @@ function StorePage() {
   const [productGridColumns, setProductGridColumns] = useState(() =>
     typeof window === "undefined" ? 3 : getProductGridColumns(window.innerWidth)
   );
-  const [categoryQuery, setCategoryQuery] = useState("");
   const [panelRotationTick, setPanelRotationTick] = useState(0);
   const { addToCart } = useCart();
   const selectedCategory = searchParams.get("category")?.trim() || "";
   const allProductsQuery = searchParams.get("q")?.trim() || "";
+  const hasSearchQuery = allProductsQuery.length > 0;
   const normalizedSelectedCategory = selectedCategory.toLowerCase();
   const buildCategoryLink = (categoryName?: string) => {
     const params = new URLSearchParams(searchParams);
@@ -267,10 +262,6 @@ function StorePage() {
       })
       .finally(() => setLoadingMore(false));
   };
-
-  useEffect(() => {
-    setCategoryQuery("");
-  }, [normalizedSelectedCategory]);
 
   useEffect(() => {
     const query = allProductsQuery.trim();
@@ -372,129 +363,85 @@ function StorePage() {
       productBlocks.push(filteredProducts.slice(index, index + itemsPerBlock));
     }
 
-    return productBlocks.map((block, blockIndex) => ({
-      products: block,
-      theme: inlinePromoThemes[blockIndex % inlinePromoThemes.length],
-      promoProducts: pickRandomProducts(sortedProducts, 4, panelRotationTick * 97 + blockIndex * 17 + 29),
-      showPromo: blockIndex < productBlocks.length - 1,
-    }));
-  }, [filteredProducts, productGridColumns, sortedProducts, panelRotationTick]);
+      return productBlocks.map((block, blockIndex) => ({
+        products: block,
+        theme: inlinePromoThemes[blockIndex % inlinePromoThemes.length],
+        promoProducts: pickRandomProducts(sortedProducts, 4, panelRotationTick * 97 + blockIndex * 17 + 29),
+        showPromo: !hasSearchQuery && blockIndex < productBlocks.length - 1,
+      }));
+  }, [filteredProducts, productGridColumns, sortedProducts, panelRotationTick, hasSearchQuery]);
 
-  const categories = useMemo(() => {
-    const grouped = new Map<string, CategoryGroup>();
+  const spotlightPanel = (
+    <section className="relative mb-6 overflow-hidden rounded-3xl border border-sky-200/70 bg-gradient-to-r from-[#b8d3f2] via-[#dcecff] to-[#c4dbf6] p-6 shadow-xl lg:p-8">
+      <div className="pointer-events-none absolute -left-14 -top-14 h-56 w-56 rounded-full bg-white/50 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-20 h-72 w-72 rounded-full bg-cyan-200/40 blur-3xl" />
 
-    sortedProducts.forEach((product) => {
-      const categoryName = product.category?.trim() || "Uncategorized";
-      const key = categoryName.toLowerCase();
-      const current = grouped.get(key);
+      <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-700/80">Seasonal Spotlight</p>
+          <h2 className="mt-2 text-3xl font-bold leading-tight text-slate-900 md:text-5xl">
+            Up to 50% off wears, shoes, watches, speakers and smart gadgets
+          </h2>
+          <p className="mt-3 max-w-xl text-sm text-slate-700 md:text-base">
+            Fresh drops and everyday essentials in one place. Style your look, upgrade your sound, and shop tech that fits your day.
+          </p>
 
-      if (current) {
-        current.products.push(product);
-      } else {
-        grouped.set(key, {
-          name: categoryName,
-          products: [product],
-        });
-      }
-    });
+          <div className="okanga-sparkle mt-5 inline-flex items-center rounded-2xl border border-white/70 bg-white/80 px-4 py-2 shadow-sm backdrop-blur">
+            <span className="okanga-glitter text-xl font-black md:text-3xl">OKANGA MART</span>
+          </div>
 
-    const normalizedCategoryQuery = categoryQuery.toLowerCase().trim();
-    const terms = normalizedCategoryQuery.split(/\s+/).filter(Boolean);
+          <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-700/70">
+            Fashion picks. Audio power. Smart lifestyle.
+          </p>
+        </div>
 
-    return Array.from(grouped.values())
-      .map((group) => {
-        if (normalizedSelectedCategory && group.name.toLowerCase() !== normalizedSelectedCategory) {
-          return null;
-        }
+        <div className="grid grid-cols-2 gap-3">
+          {heroShowcase.map((tile) => {
+            const tileContent = (
+              <>
+                <img
+                  alt={tile.title}
+                  className="h-36 w-full bg-slate-100 object-contain transition duration-500 group-hover:scale-105 md:h-40"
+                  decoding="async"
+                  src={tile.image}
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/80 via-slate-900/40 to-transparent p-3 text-white">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-white/80">{tile.category}</p>
+                  <p className="line-clamp-1 text-sm font-semibold">{tile.title}</p>
+                </div>
+              </>
+            );
 
-        const categoryMatches = terms.length === 0
-          ? true
-          : terms.every((term) => group.name.toLowerCase().includes(term));
+            if (tile.productId) {
+              return (
+                <Link
+                  className="group relative overflow-hidden rounded-2xl border border-white/70 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl"
+                  key={`hero-${tile.productId}`}
+                  state={{ productPreview: sortedProducts.find((product) => product.id === tile.productId) }}
+                  to={`/products/${tile.productId}`}
+                >
+                  {tileContent}
+                </Link>
+              );
+            }
 
-        const visibleProducts = categoryMatches
-          ? [...group.products]
-          : group.products.filter((product) => matchesSearch(product, normalizedCategoryQuery));
-
-        if (visibleProducts.length === 0) {
-          return null;
-        }
-
-        return {
-          ...group,
-          products: visibleProducts.sort(productNewestFirst),
-        };
-      })
-      .filter((group): group is CategoryGroup => group !== null)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [sortedProducts, categoryQuery, normalizedSelectedCategory]);
+            return (
+              <article
+                className="group relative overflow-hidden rounded-2xl border border-white/70 shadow-md"
+                key={`${tile.category}-${tile.title}`}
+              >
+                {tileContent}
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <section className="space-y-8">
-      <section className="relative mb-6 overflow-hidden rounded-3xl border border-sky-200/70 bg-gradient-to-r from-[#b8d3f2] via-[#dcecff] to-[#c4dbf6] p-6 shadow-xl lg:p-8">
-        <div className="pointer-events-none absolute -left-14 -top-14 h-56 w-56 rounded-full bg-white/50 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -right-20 h-72 w-72 rounded-full bg-cyan-200/40 blur-3xl" />
-
-        <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-700/80">Seasonal Spotlight</p>
-            <h2 className="mt-2 text-3xl font-bold leading-tight text-slate-900 md:text-5xl">
-              Up to 50% off wears, shoes, watches, speakers and smart gadgets
-            </h2>
-            <p className="mt-3 max-w-xl text-sm text-slate-700 md:text-base">
-              Fresh drops and everyday essentials in one place. Style your look, upgrade your sound, and shop tech that fits your day.
-            </p>
-
-            <div className="okanga-sparkle mt-5 inline-flex items-center rounded-2xl border border-white/70 bg-white/80 px-4 py-2 shadow-sm backdrop-blur">
-              <span className="okanga-glitter text-xl font-black md:text-3xl">OKANGA MART</span>
-            </div>
-
-            <p className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-700/70">
-              Fashion picks. Audio power. Smart lifestyle.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {heroShowcase.map((tile) => {
-              const tileContent = (
-                <>
-                  <img
-                    alt={tile.title}
-                    className="h-36 w-full bg-slate-100 object-contain transition duration-500 group-hover:scale-105 md:h-40"
-                    decoding="async"
-                    src={tile.image}
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/80 via-slate-900/40 to-transparent p-3 text-white">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-white/80">{tile.category}</p>
-                    <p className="line-clamp-1 text-sm font-semibold">{tile.title}</p>
-                  </div>
-                </>
-              );
-
-              if (tile.productId) {
-                return (
-                    <Link
-                      className="group relative overflow-hidden rounded-2xl border border-white/70 shadow-md transition hover:-translate-y-0.5 hover:shadow-xl"
-                      key={`hero-${tile.productId}`}
-                      state={{ productPreview: sortedProducts.find((product) => product.id === tile.productId) }}
-                      to={`/products/${tile.productId}`}
-                    >
-                    {tileContent}
-                  </Link>
-                );
-              }
-
-              return (
-                <article
-                  className="group relative overflow-hidden rounded-2xl border border-white/70 shadow-md"
-                  key={`${tile.category}-${tile.title}`}
-                >
-                  {tileContent}
-                </article>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      {!hasSearchQuery && spotlightPanel}
       {statusMessage && <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">{statusMessage}</p>}
 
       {loading ? (
@@ -603,69 +550,7 @@ function StorePage() {
               </div>
             )}
           </section>
-
-          <section id="categories" className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-xl font-semibold">Categories</h3>
-              <input
-                className="w-full max-w-md rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm"
-                placeholder="Search categories or related product keywords..."
-                type="search"
-                value={categoryQuery}
-                onChange={(event) => setCategoryQuery(event.target.value)}
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <Link
-                  className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  to={buildCategoryLink(category.name)}
-                  key={category.name}
-                >
-                  {category.name} ({category.products.length})
-                </Link>
-              ))}
-            </div>
-
-            {categories.length === 0 ? (
-              <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                No categories match your search.
-              </p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {categories.map((category) => (
-                  <article
-                    className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg"
-                    key={category.name}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-lg font-semibold">{category.name}</h4>
-                      <p className="text-sm text-slate-500">{category.products.length} products</p>
-                    </div>
-                    <p className="text-sm text-slate-600">
-                      Newest item: <span className="font-medium text-slate-900">{category.products[0]?.name ?? "No products yet"}</span>
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {category.products.slice(0, 3).map((product) => (
-                        <span
-                          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
-                          key={`category-preview-${category.name}-${product.id}`}
-                        >
-                          {product.name}
-                        </span>
-                      ))}
-                    </div>
-                    <Link
-                      className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      to={buildCategoryLink(category.name)}
-                    >
-                      {normalizedSelectedCategory === category.name.toLowerCase() ? "Jump to Products" : "Browse Category"}
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+          {hasSearchQuery && spotlightPanel}
         </>
       )}
     </section>

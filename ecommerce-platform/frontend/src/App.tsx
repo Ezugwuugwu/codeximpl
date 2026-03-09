@@ -224,6 +224,10 @@ function App() {
     setIsAccountPanelOpen(false);
   }, [location.pathname, location.search]);
 
+  const closeAccountPanel = () => {
+    setIsAccountPanelOpen(false);
+  };
+
   const logout = () => {
     clearAuthToken();
     setCurrentUserProfile(null);
@@ -356,7 +360,7 @@ function App() {
         <button
           aria-label="Close account panel"
           className="fixed inset-0 z-40 bg-slate-900/45"
-          onClick={() => setIsAccountPanelOpen(false)}
+          onClick={closeAccountPanel}
           type="button"
         />
       )}
@@ -367,14 +371,29 @@ function App() {
         }`}
       >
         <div className="border-b border-slate-200 bg-gradient-to-r from-slate-900 via-[#1e2f47] to-[#253a59] p-5 text-white">
-          <p className="text-xs uppercase tracking-[0.16em] text-slate-200">Account</p>
-          <p className="mt-2 text-2xl font-semibold">{accountName}</p>
-          <p className="mt-1 text-sm text-slate-100/90">{accountEmail}</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-200">Account</p>
+              <p className="mt-2 text-2xl font-semibold">{accountName}</p>
+              <p className="mt-1 text-sm text-slate-100/90">{accountEmail}</p>
+            </div>
+            <button
+              aria-label="Close account panel"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+              onClick={closeAccountPanel}
+              type="button"
+            >
+              <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div className="space-y-2 p-4">
           {isAdmin && (
             <Link
               className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              onClick={closeAccountPanel}
               to="/admin"
             >
               <span>Admin Dashboard</span>
@@ -389,6 +408,7 @@ function App() {
             <>
               <Link
                 className="block rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={closeAccountPanel}
                 to="/settings"
               >
                 Settings
@@ -396,7 +416,7 @@ function App() {
               <button
                 className="w-full rounded-xl bg-slate-900 px-4 py-3 text-left text-sm font-medium text-white transition hover:bg-slate-800"
                 onClick={() => {
-                  setIsAccountPanelOpen(false);
+                  closeAccountPanel();
                   logout();
                 }}
                 type="button"
@@ -408,12 +428,14 @@ function App() {
             <>
               <Link
                 className="block rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={closeAccountPanel}
                 to="/login"
               >
                 Login
               </Link>
               <Link
                 className="block rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+                onClick={closeAccountPanel}
                 to="/register"
               >
                 Register
