@@ -190,19 +190,18 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-end md:justify-between">
+    <section className="rounded-3xl border border-[#f5c955] bg-[#fff8dd] p-6 shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-[#f1deb1] pb-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Addresses</p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">Address book</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Delivery addresses now live in their own address-book module, separate from identity and password changes.
-            The default address still syncs back to your legacy profile record for compatibility.
+            Add, edit, and choose the delivery addresses your orders should use.
           </p>
         </div>
 
         <button
-          className="inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+          className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
           type="button"
           onClick={openCreateForm}
         >
@@ -221,11 +220,11 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 {activeAddress ? `Edit ${activeAddress.label}` : "Add a new address"}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Keep delivery locations separate from profile identity so checkout and account settings stay maintainable.
+                Save a reusable delivery location for checkout.
               </p>
             </div>
             <button
-              className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-white"
+              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
               type="button"
               onClick={closeForm}
             >
@@ -239,7 +238,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 Label
               </label>
               <input
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-ink focus:outline-none"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-label"
                 maxLength={80}
                 placeholder="Home, Office, Parents..."
@@ -254,7 +253,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 Country
               </label>
               <input
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-ink focus:outline-none"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-country"
                 maxLength={120}
                 type="text"
@@ -269,7 +268,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               Street address
             </label>
             <textarea
-              className="min-h-[110px] w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-ink focus:outline-none"
+              className="min-h-[110px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
               id="address-street"
               maxLength={255}
               value={form.streetAddress}
@@ -283,7 +282,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 City
               </label>
               <input
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-ink focus:outline-none"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-city"
                 maxLength={120}
                 type="text"
@@ -297,7 +296,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 State
               </label>
               <input
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-ink focus:outline-none"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-state"
                 maxLength={120}
                 type="text"
@@ -311,7 +310,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 Postal code
               </label>
               <input
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-ink focus:outline-none"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-postal-code"
                 maxLength={40}
                 type="text"
@@ -321,7 +320,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
             </div>
           </div>
 
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+          <label className="flex items-center gap-3 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
             <input
               checked={form.defaultAddress}
               className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
@@ -349,16 +348,16 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
           <div className="h-24 animate-pulse rounded-3xl bg-slate-100" />
         </div>
       ) : addresses.length === 0 ? (
-        <div className="mt-5 rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+        <div className="mt-5 rounded-3xl border border-dashed border-[#f5c955] bg-[#fffdf4] px-6 py-10 text-center">
           <p className="text-lg font-semibold text-slate-900">No saved addresses yet</p>
           <p className="mt-2 text-sm text-slate-500">
-            Add your first delivery location here so later checkout and order modules can reuse it cleanly.
+            Add your first delivery location here.
           </p>
         </div>
       ) : (
         <div className="mt-5 grid gap-4">
           {addresses.map((address) => (
-            <div key={address.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <div key={address.id} className="rounded-3xl border border-[#f1deb1] bg-[#fffdf4] p-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -384,7 +383,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 <div className="flex flex-wrap gap-2">
                   {!address.defaultAddress && (
                     <button
-                      className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-white"
+                      className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                       disabled={saving}
                       type="button"
                       onClick={() => void makeDefault(address)}
@@ -393,14 +392,14 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                     </button>
                   )}
                   <button
-                    className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-white"
+                    className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                     type="button"
                     onClick={() => openEditForm(address)}
                   >
                     Edit
                   </button>
                   <button
-                    className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
+                    className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
                     disabled={saving}
                     type="button"
                     onClick={() => void removeAddress(address)}
@@ -413,7 +412,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

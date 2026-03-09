@@ -74,7 +74,7 @@ export const authApi = {
 
 export const userApi = {
   async getMe(token: string): Promise<UserProfile> {
-    const { data } = await api.get<UserProfile>("/api/users/me", {
+    const { data } = await api.get<UserProfile>("/api/v1/users/me", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -83,7 +83,7 @@ export const userApi = {
   },
 
   async updateMe(token: string, payload: UserProfileUpdateRequest): Promise<UserProfile> {
-    const { data } = await api.put<UserProfile>("/api/users/me", payload, {
+    const { data } = await api.put<UserProfile>("/api/v1/users/me", payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -92,7 +92,7 @@ export const userApi = {
   },
 
   async changePassword(token: string, payload: PasswordChangeRequest): Promise<{ message: string }> {
-    const { data } = await api.put<{ message: string }>("/api/users/me/password", payload, {
+    const { data } = await api.put<{ message: string }>("/api/v1/users/me/password", payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -101,7 +101,7 @@ export const userApi = {
   },
 
   async listAddresses(token: string): Promise<UserAddress[]> {
-    const { data } = await api.get<UserAddress[]>("/api/users/me/addresses", {
+    const { data } = await api.get<UserAddress[]>("/api/v1/users/me/addresses", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -110,7 +110,7 @@ export const userApi = {
   },
 
   async createAddress(token: string, payload: UserAddressUpsertRequest): Promise<UserAddress> {
-    const { data } = await api.post<UserAddress>("/api/users/me/addresses", payload, {
+    const { data } = await api.post<UserAddress>("/api/v1/users/me/addresses", payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -119,7 +119,7 @@ export const userApi = {
   },
 
   async updateAddress(token: string, id: number, payload: UserAddressUpsertRequest): Promise<UserAddress> {
-    const { data } = await api.put<UserAddress>(`/api/users/me/addresses/${id}`, payload, {
+    const { data } = await api.put<UserAddress>(`/api/v1/users/me/addresses/${id}`, payload, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -128,7 +128,7 @@ export const userApi = {
   },
 
   async deleteAddress(token: string, id: number): Promise<void> {
-    await api.delete(`/api/users/me/addresses/${id}`, {
+    await api.delete(`/api/v1/users/me/addresses/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
