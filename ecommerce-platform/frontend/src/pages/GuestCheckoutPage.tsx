@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PaystackCheckoutButton from "../components/payments/PaystackCheckoutButton";
 import { orderApi } from "../services/api";
@@ -26,6 +26,7 @@ const initialCustomer: GuestOrderCustomer = {
 
 function GuestCheckoutPage() {
   const navigate = useNavigate();
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [items, setItems] = useState<GuestCartItem[]>(() => readGuestCart());
   const [customer, setCustomer] = useState<GuestOrderCustomer>(initialCustomer);
   const [message, setMessage] = useState("");
@@ -50,7 +51,74 @@ function GuestCheckoutPage() {
   const subtotal = useMemo(() => getGuestCartSubtotal(items), [items]);
   const customerComplete = Object.values(customer).every((value) => value.trim().length > 0);
 
+  const clearCustomFieldValidation = (field: "email" | "streetAddress") => {
+    const form = formRef.current;
+    if (!form) {
+      return;
+    }
+
+    if (field === "email") {
+      form.querySelector<HTMLInputElement>('input[name="guest-email"]')?.setCustomValidity("");
+      return;
+    }
+
+    form.querySelector<HTMLTextAreaElement>('textarea[name="guest-street-address"]')?.setCustomValidity("");
+  };
+
+  const validateDeliveryDetails = () => {
+    const form = formRef.current;
+    if (!form) {
+      return true;
+    }
+
+    const emailInput = form.querySelector<HTMLInputElement>('input[name="guest-email"]');
+    const addressInput = form.querySelector<HTMLTextAreaElement>('textarea[name="guest-street-address"]');
+    emailInput?.setCustomValidity("");
+    addressInput?.setCustomValidity("");
+
+    if (form.reportValidity()) {
+      const normalizedEmail = customer.email.trim().toLowerCase();
+      const [localPart = "", domain = ""] = normalizedEmail.split("@");
+      const normalizedAddress = customer.streetAddress.trim();
+
+      const invalidEmail =
+        !/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(normalizedEmail) ||
+        ((domain === "gmail.com" || domain === "googlemail.com") &&
+          (localPart.startsWith(".") || localPart.endsWith(".") || localPart.includes("..")));
+
+      if (invalidEmail) {
+        emailInput?.setCustomValidity("Enter a valid email address.");
+        emailInput?.reportValidity();
+        setMessageTone("error");
+        setMessage("Please enter a valid email address before continuing to payment.");
+        return false;
+      }
+
+      const invalidAddress =
+        normalizedAddress.length < 10 ||
+        normalizedAddress.split(/\s+/).filter(Boolean).length < 2 ||
+        !/[A-Za-z]/.test(normalizedAddress);
+
+      if (invalidAddress) {
+        addressInput?.setCustomValidity("Enter a complete delivery address.");
+        addressInput?.reportValidity();
+        setMessageTone("error");
+        setMessage("Please enter a complete delivery address before continuing to payment.");
+        return false;
+      }
+
+      return true;
+    }
+
+    setMessageTone("error");
+    setMessage("Please correct your delivery details before continuing to payment.");
+    return false;
+  };
+
   const updateField = <K extends keyof GuestOrderCustomer>(field: K, value: GuestOrderCustomer[K]) => {
+    if (field === "email" || field === "streetAddress") {
+      clearCustomFieldValidation(field);
+    }
     setCustomer((current) => ({
       ...current,
       [field]: value,
@@ -76,9 +144,9 @@ function GuestCheckoutPage() {
   };
 
   const handlePaystackSuccess = async (reference: string) => {
-    if (!customerComplete) {
+    if (!customerComplete || !validateDeliveryDetails()) {
       setMessageTone("error");
-      setMessage("Please complete your delivery details before paying.");
+      setMessage("Please correct your delivery details before continuing to payment.");
       return;
     }
     if (items.length === 0) {
@@ -167,7 +235,7 @@ function GuestCheckoutPage() {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg" onSubmit={onSubmit}>
+          <form className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg" onSubmit={onSubmit} ref={formRef}>
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Delivery details</h3>
               <p className="mt-1 text-sm text-slate-600">We use this information for payment confirmation and delivery coordination.</p>
@@ -178,7 +246,10 @@ function GuestCheckoutPage() {
                 <span>First name</span>
                 <input
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  minLength={2}
+                  pattern="[A-Za-z][A-Za-z' -]{1,}"
                   required
+                  title="Enter a valid first name."
                   type="text"
                   value={customer.firstName}
                   onChange={(event) => updateField("firstName", event.target.value)}
@@ -188,7 +259,10 @@ function GuestCheckoutPage() {
                 <span>Last name</span>
                 <input
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  minLength={2}
+                  pattern="[A-Za-z][A-Za-z' -]{1,}"
                   required
+                  title="Enter a valid last name."
                   type="text"
                   value={customer.lastName}
                   onChange={(event) => updateField("lastName", event.target.value)}
@@ -200,7 +274,9 @@ function GuestCheckoutPage() {
               <span>Email address</span>
               <input
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                name="guest-email"
                 required
+                title="Enter a valid email address."
                 type="email"
                 value={customer.email}
                 onChange={(event) => updateField("email", event.target.value)}
@@ -211,7 +287,10 @@ function GuestCheckoutPage() {
               <span>Street address</span>
               <textarea
                 className="min-h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                minLength={10}
+                name="guest-street-address"
                 required
+                title="Enter a complete delivery address."
                 value={customer.streetAddress}
                 onChange={(event) => updateField("streetAddress", event.target.value)}
               />
@@ -222,7 +301,10 @@ function GuestCheckoutPage() {
                 <span>City</span>
                 <input
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  minLength={2}
+                  pattern="[A-Za-z][A-Za-z .'-]{1,}"
                   required
+                  title="Enter a valid city."
                   type="text"
                   value={customer.city}
                   onChange={(event) => updateField("city", event.target.value)}
@@ -232,7 +314,10 @@ function GuestCheckoutPage() {
                 <span>State</span>
                 <input
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  minLength={2}
+                  pattern="[A-Za-z][A-Za-z .'-]{1,}"
                   required
+                  title="Enter a valid state or province."
                   type="text"
                   value={customer.state}
                   onChange={(event) => updateField("state", event.target.value)}
@@ -245,7 +330,9 @@ function GuestCheckoutPage() {
                 <span>Postal code</span>
                 <input
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  pattern="[A-Za-z0-9][A-Za-z0-9 -]{2,11}"
                   required
+                  title="Enter a valid postal code."
                   type="text"
                   value={customer.postalCode}
                   onChange={(event) => updateField("postalCode", event.target.value)}
@@ -255,7 +342,10 @@ function GuestCheckoutPage() {
                 <span>Country</span>
                 <input
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  minLength={2}
+                  pattern="[A-Za-z][A-Za-z .'-]{1,}"
                   required
+                  title="Enter a valid country."
                   type="text"
                   value={customer.country}
                   onChange={(event) => updateField("country", event.target.value)}
@@ -330,8 +420,16 @@ function GuestCheckoutPage() {
 
             <PaystackCheckoutButton
               amountNgn={subtotal}
+              beforeOpen={() => {
+                if (!customerComplete) {
+                  return "Please complete your delivery details before continuing to payment.";
+                }
+                return validateDeliveryDetails()
+                  ? null
+                  : "Please correct your delivery details before continuing to payment.";
+              }}
               buttonLabel="Pay as guest"
-              disabled={placing || items.length === 0 || !customerComplete}
+              disabled={placing || items.length === 0}
               email={customer.email.trim().toLowerCase()}
               onError={handlePaymentError}
               onSuccess={handlePaystackSuccess}

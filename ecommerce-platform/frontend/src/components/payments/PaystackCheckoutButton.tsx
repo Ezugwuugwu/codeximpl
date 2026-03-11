@@ -46,6 +46,7 @@ type Props = {
   amountNgn: number;
   onSuccess: (reference: string) => Promise<void>;
   onError: (message: string) => void;
+  beforeOpen?: () => string | null | Promise<string | null>;
   disabled?: boolean;
   email?: string;
   token?: string;
@@ -56,6 +57,7 @@ export default function PaystackCheckoutButton({
   amountNgn,
   onSuccess,
   onError,
+  beforeOpen,
   disabled,
   email,
   token,
@@ -64,6 +66,12 @@ export default function PaystackCheckoutButton({
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
+    const validationMessage = await beforeOpen?.();
+    if (validationMessage) {
+      onError(validationMessage);
+      return;
+    }
+
     const session = getAuthSession();
     const resolvedToken = token ?? session.token ?? undefined;
     const resolvedEmail = email ?? session.email;

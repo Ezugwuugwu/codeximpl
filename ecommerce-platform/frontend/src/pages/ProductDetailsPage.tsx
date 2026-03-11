@@ -311,7 +311,7 @@ function ProductDetailsPage() {
           <h2 className="text-3xl font-semibold">{product.name}</h2>
           <RatingDisplay rating={rating} reviewCount={reviewCount} />
           <p className="text-sm leading-6 text-slate-600">{product.description}</p>
-          <p className="text-3xl font-bold text-emerald-700">${Number(product.price).toFixed(2)}</p>
+          <p className="text-3xl font-bold text-emerald-700">NGN {Number(product.price).toFixed(2)}</p>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <p><span className="text-slate-500">Stock:</span> {product.stock}</p>

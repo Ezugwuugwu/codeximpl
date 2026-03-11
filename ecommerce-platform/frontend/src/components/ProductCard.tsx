@@ -63,7 +63,7 @@ function ProductCard({ product, onAddToCart }: Props) {
           <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">Top Rated</span>
         </div>
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-xl font-bold text-emerald-700">${Number(product.price).toFixed(2)}</p>
+          <p className="text-xl font-bold text-emerald-700">NGN {Number(product.price).toFixed(2)}</p>
           <p className="text-sm text-slate-500">Stock: {product.stock}</p>
         </div>
         <div className="mb-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
