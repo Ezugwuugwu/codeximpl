@@ -1,8 +1,9 @@
 import { FormEvent, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocationDirectory, useStreetAddressSuggestions } from "../hooks/useLocationDirectory";
 import { authApi } from "../services/api";
 import { activateGuestSession, buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
-import { formatAddressSuggestion, getEmailSuggestion, isValidEmail, isValidStreetAddress } from "../utils/contactValidation";
+import { getEmailSuggestion, isValidEmail, isValidStreetAddress } from "../utils/contactValidation";
 import { hasGuestCartItems } from "../utils/guestCart";
 
 function RegisterPage() {
@@ -11,7 +12,10 @@ function RegisterPage() {
   const [searchParams] = useSearchParams();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [address, setAddress] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [country, setCountry] = useState("Nigeria");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,7 +38,20 @@ function RegisterPage() {
       : "";
   const guestCheckoutAvailable = hasGuestCartItems();
   const emailSuggestion = useMemo(() => getEmailSuggestion(email), [email]);
-  const addressSuggestion = useMemo(() => formatAddressSuggestion(address), [address]);
+  const composedAddress = useMemo(
+    () => [streetAddress.trim(), city.trim(), state.trim(), country.trim()].filter(Boolean).join(", "),
+    [city, country, state, streetAddress]
+  );
+  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading, locationError } = useLocationDirectory(country, state);
+  const {
+    suggestions: streetSuggestions,
+    loading: streetSuggestionsLoading,
+    error: streetSuggestionsError,
+  } = useStreetAddressSuggestions(streetAddress, {
+    country,
+    state,
+    city,
+  });
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -45,15 +62,15 @@ function RegisterPage() {
       setError("Please correct the highlighted fields.");
       return;
     }
-    if (!firstName.trim() || !lastName.trim() || !address.trim()) {
-      setError("First name, last name, and address are required.");
+    if (!firstName.trim() || !lastName.trim() || !streetAddress.trim() || !country.trim() || !state.trim() || !city.trim()) {
+      setError("First name, last name, country, state, city, and street address are required.");
       return;
     }
     if (!isValidEmail(email)) {
       setError("Enter a valid email address.");
       return;
     }
-    if (!isValidStreetAddress(address)) {
+    if (!isValidStreetAddress(streetAddress)) {
       setError("Enter a complete delivery address.");
       return;
     }
@@ -71,7 +88,7 @@ function RegisterPage() {
       await authApi.register({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        address: address.trim(),
+        address: composedAddress,
         email: email.trim().toLowerCase(),
         password,
         confirmPassword,
@@ -160,57 +177,161 @@ function RegisterPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address">
-              Address
-            </label>
-              <input
-                autoComplete="street-address"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-                id="address"
-                minLength={10}
-                placeholder="123 Main St, City, State"
-                required
-                title="Enter a complete delivery address."
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
-              {addressSuggestion && (
-                <button
-                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                  onClick={() => setAddress(addressSuggestion)}
-                  type="button"
-                >
-                  Use suggested address: {addressSuggestion}
-                </button>
-              )}
-            </div>
-
-            <div>
             <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="email">
               Email address
             </label>
-              <input
-                autoComplete="email"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-                id="email"
-                placeholder="you@example.com"
+            <input
+              autoComplete="email"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+              id="email"
+              placeholder="you@example.com"
+              required
+              title="Enter a valid email address."
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            {emailSuggestion && (
+              <button
+                className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                onClick={() => setEmail(emailSuggestion)}
+                type="button"
+              >
+                Use suggested email: {emailSuggestion}
+              </button>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-3">
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-country">
+                Country
+              </label>
+              <select
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                disabled={countriesLoading || countries.length === 0}
+                id="register-country"
                 required
-                title="Enter a valid email address."
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              {emailSuggestion && (
-                <button
-                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                  onClick={() => setEmail(emailSuggestion)}
-                  type="button"
-                >
-                  Use suggested email: {emailSuggestion}
-                </button>
-              )}
+                value={country}
+                onChange={(event) => {
+                  setCountry(event.target.value);
+                  setState("");
+                  setCity("");
+                }}
+              >
+                <option value="">{countriesLoading ? "Loading countries..." : "Select country"}</option>
+                {countries.map((countryOption) => (
+                  <option key={countryOption.iso2 || countryOption.name} value={countryOption.name}>
+                    {countryOption.name}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-state">
+                State / Region
+              </label>
+              <select
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                disabled={!country || statesLoading || states.length === 0}
+                id="register-state"
+                required
+                value={state}
+                onChange={(event) => {
+                  setState(event.target.value);
+                  setCity("");
+                }}
+              >
+                <option value="">
+                  {!country ? "Select country first" : statesLoading ? "Loading states..." : "Select state"}
+                </option>
+                {states.map((stateOption) => (
+                  <option key={`${stateOption.code}-${stateOption.name}`} value={stateOption.name}>
+                    {stateOption.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-city">
+                City
+              </label>
+              <select
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                disabled={!country || !state || citiesLoading || cities.length === 0}
+                id="register-city"
+                required
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+              >
+                <option value="">
+                  {!country
+                    ? "Select country first"
+                    : !state
+                      ? "Select state first"
+                      : citiesLoading
+                        ? "Loading cities..."
+                        : "Select city"}
+                </option>
+                {cities.map((cityOption) => (
+                  <option key={cityOption} value={cityOption}>
+                    {cityOption}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-3">
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-street-address">
+                Street address
+              </label>
+              <input
+                autoComplete="street-address"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                id="register-street-address"
+                minLength={10}
+                placeholder={city ? `Start typing an address in ${city}` : "Start typing your street address"}
+                required
+                title="Enter a complete delivery address."
+                type="text"
+                value={streetAddress}
+                onChange={(event) => setStreetAddress(event.target.value)}
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Address suggestions are matched to the selected country{state ? `, ${state}` : ""}{city ? `, ${city}` : ""}.
+              </p>
+              {streetSuggestionsLoading && <p className="mt-2 text-xs text-slate-500">Searching matching addresses...</p>}
+              {!streetSuggestionsLoading && streetSuggestions.length > 0 && (
+                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                  <p className="px-2 pb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Suggested matches</p>
+                  <div className="space-y-1">
+                    {streetSuggestions.map((suggestion) => (
+                      <button
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-white"
+                        key={suggestion.id}
+                        onClick={() => setStreetAddress(suggestion.streetAddress)}
+                        type="button"
+                      >
+                        <span className="block font-medium text-slate-900">{suggestion.streetAddress}</span>
+                        <span className="block text-xs text-slate-500">{suggestion.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!streetSuggestionsLoading && !streetSuggestionsError && streetAddress.trim().length >= 3 && streetSuggestions.length === 0 && (
+                <p className="mt-2 text-xs text-slate-500">No matching addresses found for this location yet. Keep typing to refine the search.</p>
+              )}
+              {streetSuggestionsError && <p className="mt-2 text-xs text-amber-700">{streetSuggestionsError}</p>}
+              {composedAddress && <p className="mt-2 text-xs text-slate-500">Address on the account: {composedAddress}</p>}
+            </div>
+          </div>
+
+          {locationError && (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">{locationError}</p>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="password">

@@ -1,15 +1,11 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useLocationDirectory, useStreetAddressSuggestions } from "../hooks/useLocationDirectory";
 import PaystackCheckoutButton from "../components/payments/PaystackCheckoutButton";
 import { orderApi } from "../services/api";
 import type { GuestOrderCustomer } from "../types";
 import { activateGuestSession, getAuthSession } from "../utils/auth";
-import {
-  formatAddressSuggestion,
-  getEmailSuggestion,
-  isValidEmail,
-  isValidStreetAddress,
-} from "../utils/contactValidation";
+import { getEmailSuggestion, isValidEmail, isValidStreetAddress } from "../utils/contactValidation";
 import {
   clearGuestCart,
   getGuestCartSubtotal,
@@ -39,6 +35,19 @@ function GuestCheckoutPage() {
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [placing, setPlacing] = useState(false);
   const [latestOrderId, setLatestOrderId] = useState<string | null>(null);
+  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading, locationError } = useLocationDirectory(
+    customer.country,
+    customer.state
+  );
+  const {
+    suggestions: streetSuggestions,
+    loading: streetSuggestionsLoading,
+    error: streetSuggestionsError,
+  } = useStreetAddressSuggestions(customer.streetAddress, {
+    country: customer.country,
+    state: customer.state,
+    city: customer.city,
+  });
 
   useEffect(() => {
     if (getAuthSession().isAuthenticated) {
@@ -57,7 +66,6 @@ function GuestCheckoutPage() {
   const subtotal = useMemo(() => getGuestCartSubtotal(items), [items]);
   const customerComplete = Object.values(customer).every((value) => value.trim().length > 0);
   const emailSuggestion = useMemo(() => getEmailSuggestion(customer.email), [customer.email]);
-  const addressSuggestion = useMemo(() => formatAddressSuggestion(customer.streetAddress), [customer.streetAddress]);
 
   const clearCustomFieldValidation = (field: "email" | "streetAddress") => {
     const form = formRef.current;
@@ -70,7 +78,7 @@ function GuestCheckoutPage() {
       return;
     }
 
-    form.querySelector<HTMLTextAreaElement>('textarea[name="guest-street-address"]')?.setCustomValidity("");
+    form.querySelector<HTMLInputElement>('input[name="guest-street-address"]')?.setCustomValidity("");
   };
 
   const validateDeliveryDetails = () => {
@@ -80,7 +88,7 @@ function GuestCheckoutPage() {
     }
 
     const emailInput = form.querySelector<HTMLInputElement>('input[name="guest-email"]');
-    const addressInput = form.querySelector<HTMLTextAreaElement>('textarea[name="guest-street-address"]');
+    const addressInput = form.querySelector<HTMLInputElement>('input[name="guest-street-address"]');
     emailInput?.setCustomValidity("");
     addressInput?.setCustomValidity("");
 
@@ -96,10 +104,7 @@ function GuestCheckoutPage() {
         return false;
       }
 
-      const invalidAddress =
-        normalizedAddress.length < 10 ||
-        normalizedAddress.split(/\s+/).filter(Boolean).length < 2 ||
-        !/[A-Za-z]/.test(normalizedAddress);
+      const invalidAddress = !isValidStreetAddress(normalizedAddress);
 
       if (invalidAddress) {
         addressInput?.setCustomValidity("Enter a complete delivery address.");
@@ -124,6 +129,32 @@ function GuestCheckoutPage() {
     setCustomer((current) => ({
       ...current,
       [field]: value,
+    }));
+  };
+
+  const updateCountry = (value: string) => {
+    setCustomer((current) => ({
+      ...current,
+      country: value,
+      state: "",
+      city: "",
+    }));
+  };
+
+  const updateState = (value: string) => {
+    setCustomer((current) => ({
+      ...current,
+      state: value,
+      city: "",
+    }));
+  };
+
+  const applyStreetSuggestion = (streetAddress: string, postalCode: string) => {
+    clearCustomFieldValidation("streetAddress");
+    setCustomer((current) => ({
+      ...current,
+      streetAddress,
+      postalCode: postalCode || current.postalCode,
     }));
   };
 
@@ -297,61 +328,69 @@ function GuestCheckoutPage() {
               )}
             </label>
 
-            <label className="space-y-2 text-sm font-medium text-slate-700">
-              <span>Street address</span>
-              <textarea
-                autoComplete="street-address"
-                className="min-h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-                minLength={10}
-                name="guest-street-address"
-                required
-                title="Enter a complete delivery address."
-                value={customer.streetAddress}
-                onChange={(event) => updateField("streetAddress", event.target.value)}
-              />
-              {addressSuggestion && (
-                <button
-                  className="text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                  onClick={() => updateField("streetAddress", addressSuggestion)}
-                  type="button"
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="space-y-2 text-sm font-medium text-slate-700 sm:col-span-3">
+                <span>Country</span>
+                <select
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                  disabled={countriesLoading || countries.length === 0}
+                  required
+                  value={customer.country}
+                  onChange={(event) => updateCountry(event.target.value)}
                 >
-                  Use suggested address: {addressSuggestion}
-                </button>
-              )}
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
+                  <option value="">{countriesLoading ? "Loading countries..." : "Select country"}</option>
+                  {countries.map((country) => (
+                    <option key={country.iso2 || country.name} value={country.name}>
+                      {country.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500">Choose the delivery country first. States and cities are filtered from this selection.</p>
+              </label>
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>State / Region</span>
+                <select
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                  disabled={!customer.country || statesLoading || states.length === 0}
+                  required
+                  value={customer.state}
+                  onChange={(event) => updateState(event.target.value)}
+                >
+                  <option value="">
+                    {!customer.country ? "Select country first" : statesLoading ? "Loading states..." : "Select state"}
+                  </option>
+                  {states.map((state) => (
+                    <option key={`${state.code}-${state.name}`} value={state.name}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>City</span>
-                <input
-                  autoComplete="address-level2"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-                  minLength={2}
-                  pattern="[A-Za-z][A-Za-z .'-]{1,}"
+                <select
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                  disabled={!customer.country || !customer.state || citiesLoading || cities.length === 0}
                   required
-                  title="Enter a valid city."
-                  type="text"
                   value={customer.city}
                   onChange={(event) => updateField("city", event.target.value)}
-                />
+                >
+                  <option value="">
+                    {!customer.country
+                      ? "Select country first"
+                      : !customer.state
+                        ? "Select state first"
+                        : citiesLoading
+                          ? "Loading cities..."
+                          : "Select city"}
+                  </option>
+                  {cities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <label className="space-y-2 text-sm font-medium text-slate-700">
-                <span>State</span>
-                <input
-                  autoComplete="address-level1"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-                  minLength={2}
-                  pattern="[A-Za-z][A-Za-z .'-]{1,}"
-                  required
-                  title="Enter a valid state or province."
-                  type="text"
-                  value={customer.state}
-                  onChange={(event) => updateField("state", event.target.value)}
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>Postal code</span>
                 <input
@@ -365,21 +404,51 @@ function GuestCheckoutPage() {
                   onChange={(event) => updateField("postalCode", event.target.value)}
                 />
               </label>
-              <label className="space-y-2 text-sm font-medium text-slate-700">
-                <span>Country</span>
-                <input
-                  autoComplete="country-name"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-                  minLength={2}
-                  pattern="[A-Za-z][A-Za-z .'-]{1,}"
-                  required
-                  title="Enter a valid country."
-                  type="text"
-                  value={customer.country}
-                  onChange={(event) => updateField("country", event.target.value)}
-                />
-              </label>
             </div>
+
+            <label className="space-y-2 text-sm font-medium text-slate-700">
+              <span>Street address</span>
+              <input
+                autoComplete="street-address"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                minLength={10}
+                name="guest-street-address"
+                placeholder={customer.city ? `Start typing an address in ${customer.city}` : "Start typing your street address"}
+                required
+                title="Enter a complete delivery address."
+                type="text"
+                value={customer.streetAddress}
+                onChange={(event) => updateField("streetAddress", event.target.value)}
+              />
+              <p className="text-xs text-slate-500">
+                Street suggestions are matched to the selected country{customer.state ? `, ${customer.state}` : ""}{customer.city ? `, ${customer.city}` : ""}.
+              </p>
+              {streetSuggestionsLoading && <p className="text-xs text-slate-500">Searching matching addresses...</p>}
+              {!streetSuggestionsLoading && streetSuggestions.length > 0 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                  <p className="px-2 pb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Suggested matches</p>
+                  <div className="space-y-1">
+                    {streetSuggestions.map((suggestion) => (
+                      <button
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-white"
+                        key={suggestion.id}
+                        onClick={() => applyStreetSuggestion(suggestion.streetAddress, suggestion.postalCode)}
+                        type="button"
+                      >
+                        <span className="block font-medium text-slate-900">{suggestion.streetAddress}</span>
+                        <span className="block text-xs text-slate-500">{suggestion.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!streetSuggestionsLoading && !streetSuggestionsError && customer.streetAddress.trim().length >= 3 && streetSuggestions.length === 0 && (
+                <p className="text-xs text-slate-500">No matching addresses found for this location yet. Keep typing to refine the search.</p>
+              )}
+              {streetSuggestionsError && <p className="text-xs text-amber-700">{streetSuggestionsError}</p>}
+            </label>
+
+            {locationError && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">{locationError}</p>}
           </form>
 
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">

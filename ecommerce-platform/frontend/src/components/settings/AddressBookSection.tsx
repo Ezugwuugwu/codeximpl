@@ -1,12 +1,8 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useLocationDirectory, useStreetAddressSuggestions } from "../../hooks/useLocationDirectory";
 import { userApi } from "../../services/api";
 import type { UserAddress, UserAddressUpsertRequest } from "../../types";
-import {
-  formatAddressSuggestion,
-  formatPlaceSuggestion,
-  getPostalCodeSuggestion,
-  isValidStreetAddress,
-} from "../../utils/contactValidation";
+import { isValidStreetAddress } from "../../utils/contactValidation";
 
 type AddressBookSectionProps = {
   token: string;
@@ -41,17 +37,25 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
   const [form, setForm] = useState<UserAddressUpsertRequest>(emptyForm);
+  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading, locationError } = useLocationDirectory(
+    form.country,
+    form.state
+  );
+  const {
+    suggestions: streetSuggestions,
+    loading: streetSuggestionsLoading,
+    error: streetSuggestionsError,
+  } = useStreetAddressSuggestions(form.streetAddress, {
+    country: form.country,
+    state: form.state,
+    city: form.city,
+  });
 
   const hasExistingAddresses = addresses.length > 0;
   const activeAddress = useMemo(
     () => addresses.find((address) => address.id === editingAddressId) ?? null,
     [addresses, editingAddressId]
   );
-  const streetSuggestion = useMemo(() => formatAddressSuggestion(form.streetAddress), [form.streetAddress]);
-  const citySuggestion = useMemo(() => formatPlaceSuggestion(form.city), [form.city]);
-  const stateSuggestion = useMemo(() => formatPlaceSuggestion(form.state), [form.state]);
-  const countrySuggestion = useMemo(() => formatPlaceSuggestion(form.country), [form.country]);
-  const postalCodeSuggestion = useMemo(() => getPostalCodeSuggestion(form.postalCode), [form.postalCode]);
 
   const focusAddressForm = () => {
     window.setTimeout(() => {
@@ -114,6 +118,31 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
     setEditingAddressId(null);
     setForm(emptyForm);
     setIsFormOpen(false);
+  };
+
+  const updateCountry = (value: string) => {
+    setForm((current) => ({
+      ...current,
+      country: value,
+      state: "",
+      city: "",
+    }));
+  };
+
+  const updateState = (value: string) => {
+    setForm((current) => ({
+      ...current,
+      state: value,
+      city: "",
+    }));
+  };
+
+  const applyStreetSuggestion = (streetAddress: string, postalCode: string) => {
+    setForm((current) => ({
+      ...current,
+      streetAddress,
+      postalCode: postalCode || current.postalCode,
+    }));
   };
 
   const onSubmit = async (event: FormEvent) => {
@@ -277,115 +306,78 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               />
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-country">
-                Country
-              </label>
-              <input
-                autoComplete="country-name"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
+            <label className="sm:col-span-2" htmlFor="address-country">
+              <span className="mb-1 block text-sm font-medium text-slate-700">Country</span>
+              <select
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                disabled={countriesLoading || countries.length === 0}
                 id="address-country"
-                maxLength={120}
-                minLength={2}
-                pattern="[A-Za-z][A-Za-z .'-]{1,}"
-                title="Enter a valid country."
-                type="text"
+                required
                 value={form.country}
-                onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))}
-              />
-              {countrySuggestion && (
-                <button
-                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                  onClick={() => setForm((current) => ({ ...current, country: countrySuggestion }))}
-                  type="button"
-                >
-                  Use suggested country: {countrySuggestion}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-street">
-              Street address
-            </label>
-            <textarea
-              autoComplete="street-address"
-              className="min-h-[110px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
-              id="address-street"
-              maxLength={255}
-              minLength={10}
-              required
-              title="Enter a complete delivery address."
-              value={form.streetAddress}
-              onChange={(event) => setForm((current) => ({ ...current, streetAddress: event.target.value }))}
-            />
-            {streetSuggestion && (
-              <button
-                className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                onClick={() => setForm((current) => ({ ...current, streetAddress: streetSuggestion }))}
-                type="button"
+                onChange={(event) => updateCountry(event.target.value)}
               >
-                Use suggested address: {streetSuggestion}
-              </button>
-            )}
+                <option value="">{countriesLoading ? "Loading countries..." : "Select country"}</option>
+                {countries.map((country) => (
+                  <option key={country.iso2 || country.name} value={country.name}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-slate-500">Choose the delivery country first. The state and city lists are loaded from that country.</p>
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-city">
-                City
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-state">
+                State / Region
               </label>
-              <input
-                autoComplete="address-level2"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
-                id="address-city"
-                maxLength={120}
-                minLength={2}
-                pattern="[A-Za-z][A-Za-z .'-]{1,}"
+              <select
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                disabled={!form.country || statesLoading || states.length === 0}
+                id="address-state"
                 required
-                title="Enter a valid city."
-                type="text"
-                value={form.city}
-                onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
-              />
-              {citySuggestion && (
-                <button
-                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                  onClick={() => setForm((current) => ({ ...current, city: citySuggestion }))}
-                  type="button"
-                >
-                  Use suggested city: {citySuggestion}
-                </button>
-              )}
+                value={form.state}
+                onChange={(event) => updateState(event.target.value)}
+              >
+                <option value="">
+                  {!form.country ? "Select country first" : statesLoading ? "Loading states..." : "Select state"}
+                </option>
+                {states.map((state) => (
+                  <option key={`${state.code}-${state.name}`} value={state.name}>
+                    {state.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-state">
-                State
+              <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-city">
+                City
               </label>
-              <input
-                autoComplete="address-level1"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
-                id="address-state"
-                maxLength={120}
-                minLength={2}
-                pattern="[A-Za-z][A-Za-z .'-]{1,}"
+              <select
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
+                disabled={!form.country || !form.state || citiesLoading || cities.length === 0}
+                id="address-city"
                 required
-                title="Enter a valid state or province."
-                type="text"
-                value={form.state}
-                onChange={(event) => setForm((current) => ({ ...current, state: event.target.value }))}
-              />
-              {stateSuggestion && (
-                <button
-                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                  onClick={() => setForm((current) => ({ ...current, state: stateSuggestion }))}
-                  type="button"
-                >
-                  Use suggested state: {stateSuggestion}
-                </button>
-              )}
+                value={form.city}
+                onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
+              >
+                <option value="">
+                  {!form.country
+                    ? "Select country first"
+                    : !form.state
+                      ? "Select state first"
+                      : citiesLoading
+                        ? "Loading cities..."
+                        : "Select city"}
+                </option>
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -403,17 +395,55 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 value={form.postalCode}
                 onChange={(event) => setForm((current) => ({ ...current, postalCode: event.target.value }))}
               />
-              {postalCodeSuggestion && (
-                <button
-                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
-                  onClick={() => setForm((current) => ({ ...current, postalCode: postalCodeSuggestion }))}
-                  type="button"
-                >
-                  Use suggested postal code: {postalCodeSuggestion}
-                </button>
-              )}
             </div>
           </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-street">
+              Street address
+            </label>
+            <input
+              autoComplete="street-address"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
+              id="address-street"
+              maxLength={255}
+              minLength={10}
+              placeholder={form.city ? `Start typing an address in ${form.city}` : "Start typing your street address"}
+              required
+              title="Enter a complete delivery address."
+              type="text"
+              value={form.streetAddress}
+              onChange={(event) => setForm((current) => ({ ...current, streetAddress: event.target.value }))}
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              Street suggestions are scoped to the selected country{form.state ? `, ${form.state}` : ""}{form.city ? `, ${form.city}` : ""}.
+            </p>
+            {streetSuggestionsLoading && <p className="mt-2 text-xs text-slate-500">Searching matching addresses...</p>}
+            {!streetSuggestionsLoading && streetSuggestions.length > 0 && (
+              <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-2">
+                <p className="px-2 pb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Suggested matches</p>
+                <div className="space-y-1">
+                  {streetSuggestions.map((suggestion) => (
+                    <button
+                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                      key={suggestion.id}
+                      onClick={() => applyStreetSuggestion(suggestion.streetAddress, suggestion.postalCode)}
+                      type="button"
+                    >
+                      <span className="block font-medium text-slate-900">{suggestion.streetAddress}</span>
+                      <span className="block text-xs text-slate-500">{suggestion.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!streetSuggestionsLoading && !streetSuggestionsError && form.streetAddress.trim().length >= 3 && streetSuggestions.length === 0 && (
+              <p className="mt-2 text-xs text-slate-500">No matching addresses found for this location yet. Keep typing to refine the search.</p>
+            )}
+            {streetSuggestionsError && <p className="mt-2 text-xs text-amber-700">{streetSuggestionsError}</p>}
+          </div>
+
+          {locationError && <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">{locationError}</p>}
 
           <label className="flex items-center gap-3 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
             <input
