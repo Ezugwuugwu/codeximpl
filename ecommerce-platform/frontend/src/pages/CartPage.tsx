@@ -1,23 +1,69 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PaystackCheckoutButton from "../components/payments/PaystackCheckoutButton";
 import { useCart } from "../context/CartContext";
+import { AUTH_TOKEN_STORAGE_KEY, buildAuthEntryPath, getAuthSession, GUEST_SESSION_STORAGE_KEY } from "../utils/auth";
+import {
+  clearGuestCart,
+  GUEST_CART_STORAGE_KEY,
+  getGuestCartSubtotal,
+  readGuestCart,
+  removeGuestCartItem,
+  type GuestCartItem,
+} from "../utils/guestCart";
 
 function CartPage() {
   const navigate = useNavigate();
   const { cart, loading, removeFromCart, clearCart, placeOrder } = useCart();
+  const [authSession, setAuthSession] = useState(() => getAuthSession());
+  const [guestItems, setGuestItems] = useState<GuestCartItem[]>(() => readGuestCart());
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [latestOrderId, setLatestOrderId] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
+  const showingGuestCart = !authSession.isAuthenticated && (authSession.isGuest || guestItems.length > 0);
+  const items = showingGuestCart ? guestItems : cart?.items ?? [];
+  const loginPath = buildAuthEntryPath("login", "/cart", "cart");
 
-  const items = cart?.items ?? [];
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0),
-    [items]
+    () => (
+      showingGuestCart
+        ? getGuestCartSubtotal(guestItems)
+        : items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0)
+    ),
+    [guestItems, items, showingGuestCart]
   );
 
+  useEffect(() => {
+    const syncAuthSession = () => setAuthSession(getAuthSession());
+    const syncGuestItems = () => setGuestItems(readGuestCart());
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === AUTH_TOKEN_STORAGE_KEY || event.key === GUEST_SESSION_STORAGE_KEY) {
+        syncAuthSession();
+      }
+      if (!event.key || event.key === GUEST_CART_STORAGE_KEY) {
+        syncGuestItems();
+      }
+    };
+
+    window.addEventListener("auth-changed", syncAuthSession);
+    window.addEventListener("guest-cart-changed", syncGuestItems);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("auth-changed", syncAuthSession);
+      window.removeEventListener("guest-cart-changed", syncGuestItems);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
   const onRemove = async (productId: number) => {
+    setLatestOrderId(null);
+    if (showingGuestCart) {
+      removeGuestCartItem(productId);
+      setMessage("");
+      return;
+    }
+
     try {
       await removeFromCart(productId);
       setMessage("");
@@ -29,6 +75,13 @@ function CartPage() {
 
   const onClear = async () => {
     setLatestOrderId(null);
+    if (showingGuestCart) {
+      clearGuestCart();
+      setMessageTone("success");
+      setMessage("Guest cart cleared.");
+      return;
+    }
+
     try {
       await clearCart();
       setMessageTone("success");
@@ -63,14 +116,21 @@ function CartPage() {
     }
   };
 
-  if (loading) {
+  if (!showingGuestCart && loading) {
     return <p className="text-sm text-slate-600">Loading cart...</p>;
   }
 
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-semibold">Cart</h2>
+        <div>
+          <h2 className="text-2xl font-semibold">{showingGuestCart ? "Guest Cart" : "Cart"}</h2>
+          {showingGuestCart && (
+            <p className="mt-1 text-sm text-slate-600">
+              Guest checkout is active. You can keep shopping and pay for all items together.
+            </p>
+          )}
+        </div>
         <Link className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700" to="/">
           Continue Shopping
         </Link>
@@ -92,7 +152,9 @@ function CartPage() {
       )}
 
       {items.length === 0 ? (
-        <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-lg">Your cart is empty.</p>
+        <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-lg">
+          {showingGuestCart ? "Your guest cart is empty." : "Your cart is empty."}
+        </p>
       ) : (
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-lg">
@@ -117,9 +179,9 @@ function CartPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-slate-600">
-                    ₦{Number(item.unitPrice).toFixed(2)} x {item.quantity}
+                    NGN {Number(item.unitPrice).toFixed(2)} x {item.quantity}
                   </p>
-                  <p className="font-semibold">₦{(Number(item.unitPrice) * item.quantity).toFixed(2)}</p>
+                  <p className="font-semibold">NGN {(Number(item.unitPrice) * item.quantity).toFixed(2)}</p>
                   <button
                     className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-700"
                     onClick={(event) => {
@@ -146,23 +208,44 @@ function CartPage() {
           </div>
 
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
-            <p className="text-lg font-semibold">Subtotal: ₦{subtotal.toFixed(2)}</p>
+            <p className="text-lg font-semibold">Subtotal: NGN {subtotal.toFixed(2)}</p>
             <div className="flex flex-wrap gap-2">
               <button
                 className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
                 onClick={onClear}
                 type="button"
               >
-                Clear Cart
+                {showingGuestCart ? "Clear Guest Cart" : "Clear Cart"}
               </button>
-              <PaystackCheckoutButton
-                amountNgn={subtotal}
-                disabled={placing}
-                onError={onPaymentError}
-                onSuccess={onPaystackSuccess}
-              />
+              {showingGuestCart ? (
+                <>
+                  <Link
+                    className="rounded-xl bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+                    to="/guest-checkout"
+                  >
+                    Proceed to Guest Checkout
+                  </Link>
+                  <Link
+                    className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+                    to={loginPath}
+                  >
+                    Sign In Instead
+                  </Link>
+                </>
+              ) : (
+                <PaystackCheckoutButton
+                  amountNgn={subtotal}
+                  disabled={placing}
+                  onError={onPaymentError}
+                  onSuccess={onPaystackSuccess}
+                />
+              )}
             </div>
-            {placing && <p className="text-sm text-slate-600">Finalizing your order...</p>}
+            {showingGuestCart ? (
+              <p className="text-sm text-slate-600">Your guest basket stays available while you continue shopping.</p>
+            ) : (
+              placing && <p className="text-sm text-slate-600">Finalizing your order...</p>
+            )}
           </div>
         </div>
       )}

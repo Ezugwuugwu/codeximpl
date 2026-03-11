@@ -1,5 +1,12 @@
+export const AUTH_TOKEN_STORAGE_KEY = "auth_token";
+export const GUEST_SESSION_STORAGE_KEY = "okanga_guest_session_active";
+
+function dispatchAuthChange() {
+  window.dispatchEvent(new Event("auth-changed"));
+}
+
 export function getAuthToken(): string {
-  return localStorage.getItem("auth_token") || "";
+  return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "";
 }
 
 export type AuthRole = "USER" | "ADMIN";
@@ -11,6 +18,8 @@ export type AuthSession = {
   role: AuthRole | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isGuest: boolean;
+  hasShoppingAccess: boolean;
 };
 
 export type AuthRedirectIntent = "cart" | "checkout";
@@ -42,13 +51,16 @@ function decodeJwtPayload(token: string): JwtPayload | null {
 export function getAuthSession(): AuthSession {
   const token = getAuthToken();
   if (!token) {
+    const isGuest = isGuestSessionActive();
     return {
       token: "",
       email: "",
-      displayName: "",
+      displayName: isGuest ? "Guest Checkout" : "",
       role: null,
       isAuthenticated: false,
       isAdmin: false,
+      isGuest,
+      hasShoppingAccess: isGuest,
     };
   }
 
@@ -72,17 +84,37 @@ export function getAuthSession(): AuthSession {
     role,
     isAuthenticated: Boolean(token),
     isAdmin: role === "ADMIN",
+    isGuest: false,
+    hasShoppingAccess: true,
   };
 }
 
 export function setAuthToken(token: string): void {
-  localStorage.setItem("auth_token", token);
-  window.dispatchEvent(new Event("auth-changed"));
+  localStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  dispatchAuthChange();
 }
 
 export function clearAuthToken(): void {
-  localStorage.removeItem("auth_token");
-  window.dispatchEvent(new Event("auth-changed"));
+  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  dispatchAuthChange();
+}
+
+export function isGuestSessionActive(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(GUEST_SESSION_STORAGE_KEY) === "true";
+}
+
+export function activateGuestSession(): void {
+  localStorage.setItem(GUEST_SESSION_STORAGE_KEY, "true");
+  dispatchAuthChange();
+}
+
+export function clearGuestSession(): void {
+  localStorage.removeItem(GUEST_SESSION_STORAGE_KEY);
+  dispatchAuthChange();
 }
 
 export function getCurrentUserId(): string {

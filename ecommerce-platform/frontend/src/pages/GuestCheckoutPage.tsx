@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import PaystackCheckoutButton from "../components/payments/PaystackCheckoutButton";
 import { orderApi } from "../services/api";
 import type { GuestOrderCustomer } from "../types";
-import { getAuthSession } from "../utils/auth";
+import { activateGuestSession, getAuthSession } from "../utils/auth";
 import {
   clearGuestCart,
   getGuestCartSubtotal,
@@ -36,7 +36,9 @@ function GuestCheckoutPage() {
   useEffect(() => {
     if (getAuthSession().isAuthenticated) {
       navigate("/cart", { replace: true });
+      return;
     }
+    activateGuestSession();
   }, [navigate]);
 
   useEffect(() => {

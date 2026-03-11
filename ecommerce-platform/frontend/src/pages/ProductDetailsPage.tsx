@@ -7,8 +7,15 @@ import axios from "axios";
 import RatingDisplay from "../components/RatingDisplay";
 import { getProductRating, getProductReviewCount } from "../utils/productPresentation";
 import { cacheProduct, readCachedProduct } from "../utils/productCache";
-import { buildAuthEntryPath, getAuthSession } from "../utils/auth";
-import { addGuestCartProduct, replaceGuestCartWithProduct } from "../utils/guestCart";
+import { AUTH_TOKEN_STORAGE_KEY, buildAuthEntryPath, getAuthSession, GUEST_SESSION_STORAGE_KEY } from "../utils/auth";
+import {
+  addGuestCartProduct,
+  GUEST_CART_STORAGE_KEY,
+  readGuestCart,
+  removeGuestCartItem,
+  replaceGuestCartWithProduct,
+  updateGuestCartItemQuantity,
+} from "../utils/guestCart";
 
 const fallbackImage = "https://picsum.photos/seed/product-fallback/1000/700";
 
@@ -31,6 +38,8 @@ function ProductDetailsPage() {
   const [loadError, setLoadError] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [loading, setLoading] = useState(initialProduct === null);
+  const [authSession, setAuthSession] = useState(() => getAuthSession());
+  const [guestCartItems, setGuestCartItems] = useState(() => readGuestCart());
   const openedFromCart = searchParams.get("from") === "cart";
   const quantityInitializedRef = useRef(false);
   const authRedirectTarget = `${location.pathname}${location.search}${location.hash}`;
@@ -39,9 +48,35 @@ function ProductDetailsPage() {
     if (!product) {
       return 0;
     }
+    if (!authSession.isAuthenticated) {
+      const guestItem = guestCartItems.find((item) => item.productId === product.id);
+      return guestItem?.quantity ?? 0;
+    }
     const match = cart?.items.find((item) => item.productId === product.id);
     return match?.quantity ?? 0;
-  }, [cart?.items, product]);
+  }, [authSession.isAuthenticated, cart?.items, guestCartItems, product]);
+
+  useEffect(() => {
+    const syncAuthSession = () => setAuthSession(getAuthSession());
+    const syncGuestCart = () => setGuestCartItems(readGuestCart());
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === AUTH_TOKEN_STORAGE_KEY || event.key === GUEST_SESSION_STORAGE_KEY) {
+        syncAuthSession();
+      }
+      if (!event.key || event.key === GUEST_CART_STORAGE_KEY) {
+        syncGuestCart();
+      }
+    };
+
+    window.addEventListener("auth-changed", syncAuthSession);
+    window.addEventListener("guest-cart-changed", syncGuestCart);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("auth-changed", syncAuthSession);
+      window.removeEventListener("guest-cart-changed", syncGuestCart);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   useEffect(() => {
     setLoadError("");
@@ -93,18 +128,32 @@ function ProductDetailsPage() {
   // re-syncing quantity back to the new cart total (which caused the bug
   // where each subsequent click added an ever-growing amount).
   useEffect(() => {
-    if (!product || cart === null || quantityInitializedRef.current) {
+    if (!product || quantityInitializedRef.current) {
+      return;
+    }
+    if (authSession.isAuthenticated && cart === null) {
       return;
     }
     quantityInitializedRef.current = true;
     setQuantity(openedFromCart ? existingCartQuantity : 0);
-  }, [product, cart, existingCartQuantity, openedFromCart]);
+  }, [authSession.isAuthenticated, product, cart, existingCartQuantity, openedFromCart]);
 
   const addItem = async () => {
     if (!product) {
       return;
     }
-    if (!getAuthSession().isAuthenticated) {
+    if (authSession.isGuest) {
+      if (quantity <= 0) {
+        setMessage("Quantity must be at least 1.");
+        return;
+      }
+      addGuestCartProduct(product, quantity);
+      setMessage(`${quantity} x ${product.name} added to your guest cart.`);
+      setQuantity(0);
+      setTimeout(() => setMessage(""), 2200);
+      return;
+    }
+    if (!authSession.isAuthenticated) {
       addGuestCartProduct(product, quantity);
       navigate(buildAuthEntryPath("login", authRedirectTarget, "cart"));
       return;
@@ -127,7 +176,16 @@ function ProductDetailsPage() {
     if (!product) {
       return;
     }
-    if (!getAuthSession().isAuthenticated) {
+    if (authSession.isGuest) {
+      if (quantity <= 0) {
+        setMessage("Quantity must be at least 1.");
+        return;
+      }
+      addGuestCartProduct(product, quantity);
+      navigate("/guest-checkout");
+      return;
+    }
+    if (!authSession.isAuthenticated) {
       replaceGuestCartWithProduct(product, quantity);
       navigate(buildAuthEntryPath("login", authRedirectTarget, "checkout"));
       return;
@@ -148,7 +206,22 @@ function ProductDetailsPage() {
     if (!product) {
       return;
     }
-    if (!getAuthSession().isAuthenticated) {
+    if (authSession.isGuest) {
+      if (quantity < 0) {
+        setMessage("Quantity cannot be negative.");
+        return;
+      }
+      if (quantity === 0) {
+        removeGuestCartItem(product.id);
+        setMessage(`${product.name} removed from your guest cart.`);
+      } else {
+        updateGuestCartItemQuantity(product.id, quantity);
+        setMessage(`Guest cart updated. ${product.name} quantity is now ${quantity}.`);
+      }
+      setTimeout(() => setMessage(""), 2200);
+      return;
+    }
+    if (!authSession.isAuthenticated) {
       replaceGuestCartWithProduct(product, quantity);
       navigate(buildAuthEntryPath("login", authRedirectTarget, "cart"));
       return;

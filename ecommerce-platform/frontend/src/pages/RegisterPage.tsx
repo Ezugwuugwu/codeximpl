@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "../services/api";
-import { buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
+import { activateGuestSession, buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
 import { hasGuestCartItems } from "../utils/guestCart";
 
 function RegisterPage() {
@@ -93,6 +93,7 @@ function RegisterPage() {
         {guestCheckoutAvailable && (
           <Link
             className="mb-4 flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-amber-100"
+            onClick={activateGuestSession}
             to="/guest-checkout"
           >
             <span>Continue as guest checkout</span>

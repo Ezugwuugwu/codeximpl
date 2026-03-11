@@ -1,6 +1,6 @@
 import type { Product } from "../types";
 
-const GUEST_CART_STORAGE_KEY = "okanga_guest_checkout_cart";
+export const GUEST_CART_STORAGE_KEY = "okanga_guest_checkout_cart";
 const fallbackImage = "https://picsum.photos/seed/product-fallback/1000/700";
 
 export type GuestCartItem = {
@@ -96,6 +96,10 @@ function toGuestCartItem(product: Product, quantity: number): GuestCartItem {
 
 export function hasGuestCartItems(): boolean {
   return readGuestCart().length > 0;
+}
+
+export function getGuestCartCount(items: GuestCartItem[] = readGuestCart()): number {
+  return new Set(items.map((item) => item.productId)).size;
 }
 
 export function addGuestCartProduct(product: Product, quantity = 1) {

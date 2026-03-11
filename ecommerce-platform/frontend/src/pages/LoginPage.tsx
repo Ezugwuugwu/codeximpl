@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { authApi, cartApi } from "../services/api";
 import axios from "axios";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { buildAuthEntryPath, sanitizeRedirectTarget, setAuthToken } from "../utils/auth";
+import { activateGuestSession, buildAuthEntryPath, sanitizeRedirectTarget, setAuthToken } from "../utils/auth";
 import { hasGuestCartItems, readGuestCart, removeGuestCartItem } from "../utils/guestCart";
 
 function LoginPage() {
@@ -87,6 +87,7 @@ function LoginPage() {
         {guestCheckoutAvailable && (
           <Link
             className="mb-4 flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-slate-800 transition hover:bg-amber-100"
+            onClick={activateGuestSession}
             to="/guest-checkout"
           >
             <span>Continue as guest checkout</span>

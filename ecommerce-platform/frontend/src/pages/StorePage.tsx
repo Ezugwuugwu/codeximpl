@@ -319,8 +319,14 @@ function StorePage() {
   const sortedProducts = useMemo(() => [...products].sort(productNewestFirst), [products]);
 
   const onAddToCart = async (product: Product, quantity: number) => {
-    if (!getAuthSession().isAuthenticated) {
+    const session = getAuthSession();
+    if (!session.isAuthenticated) {
       addGuestCartProduct(product, quantity);
+      if (session.isGuest) {
+        setStatusMessage(`${quantity} x ${product.name} added to your guest cart.`);
+        setTimeout(() => setStatusMessage(""), 2500);
+        return;
+      }
       navigate(buildAuthEntryPath("login", `${location.pathname}${location.search}${location.hash}`, "cart"));
       return;
     }

@@ -17,13 +17,15 @@ import GuestCheckoutPage from "./pages/GuestCheckoutPage";
 import SiteFooter from "./components/layout/SiteFooter";
 import type { LiveAgentSession } from "./types/support";
 import type { UserProfile } from "./types";
-import { clearAuthToken, getAuthSession } from "./utils/auth";
+import { AUTH_TOKEN_STORAGE_KEY, clearAuthToken, getAuthSession, GUEST_SESSION_STORAGE_KEY } from "./utils/auth";
+import { GUEST_CART_STORAGE_KEY, getGuestCartCount } from "./utils/guestCart";
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const { cartCount } = useCart();
   const [authSession, setAuthSession] = useState(() => getAuthSession());
+  const [guestCartCount, setGuestCartCount] = useState(() => getGuestCartCount());
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [liveAgentUnread, setLiveAgentUnread] = useState(0);
@@ -31,9 +33,11 @@ function App() {
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const token = authSession.token || undefined;
   const isAuthenticated = authSession.isAuthenticated;
+  const isGuest = authSession.isGuest;
   const userEmail = currentUserProfile?.email || authSession.email || null;
   const userName = currentUserProfile?.fullName || authSession.displayName || null;
   const isAdmin = (currentUserProfile?.role ?? authSession.role) === "ADMIN";
+  const displayedCartCount = isAuthenticated ? cartCount : guestCartCount;
   const normalizedCategories = useMemo(
     () => categories.map((category) => category.trim()).filter((category) => category.length > 0),
     [categories]
@@ -42,18 +46,22 @@ function App() {
   const storeSearchQuery = storeParams.get("q") ?? "";
   const selectedCategory = (storeParams.get("category") ?? "").trim().toLowerCase();
   const accountName = useMemo(() => {
-    const raw = userName ?? (userEmail ? userEmail.split("@")[0].replace(/[._-]+/g, " ") : "Guest User");
+    const raw = userName ?? (userEmail
+      ? userEmail.split("@")[0].replace(/[._-]+/g, " ")
+      : isGuest
+        ? "Guest Checkout"
+        : "Guest User");
     return raw
       .trim()
       .replace(/\s+/g, " ")
       .replace(/\b\w/g, (match) => match.toUpperCase());
-  }, [userName, userEmail]);
-  const accountEmail = userEmail ?? "No account signed in";
+  }, [isGuest, userName, userEmail]);
+  const accountEmail = isGuest ? "Guest session active" : userEmail ?? "No account signed in";
 
   useEffect(() => {
     const syncAuthSession = () => setAuthSession(getAuthSession());
     const onStorage = (event: StorageEvent) => {
-      if (!event.key || event.key === "auth_token") {
+      if (!event.key || event.key === AUTH_TOKEN_STORAGE_KEY || event.key === GUEST_SESSION_STORAGE_KEY) {
         syncAuthSession();
       }
     };
@@ -62,6 +70,24 @@ function App() {
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("auth-changed", syncAuthSession);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncGuestCartCount = () => setGuestCartCount(getGuestCartCount());
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === GUEST_CART_STORAGE_KEY) {
+        syncGuestCartCount();
+      }
+    };
+
+    window.addEventListener("guest-cart-changed", syncGuestCartCount);
+    window.addEventListener("auth-changed", syncGuestCartCount);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("guest-cart-changed", syncGuestCartCount);
+      window.removeEventListener("auth-changed", syncGuestCartCount);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
@@ -280,9 +306,9 @@ function App() {
                     <path d="M2 3h2.7c.4 0 .8.3.9.7l2.2 11c.1.4.5.7.9.7h9.8c.4 0 .8-.3.9-.7l1.7-7.4a1 1 0 0 0-1-.9H7.2" />
                   </svg>
                   <span className="sr-only">Cart</span>
-                  {cartCount > 0 && (
+                  {displayedCartCount > 0 && (
                     <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#f5c955] px-1 text-[10px] font-bold text-slate-900">
-                      {cartCount > 99 ? "99+" : cartCount}
+                      {displayedCartCount > 99 ? "99+" : displayedCartCount}
                     </span>
                   )}
                 </Link>
@@ -427,6 +453,33 @@ function App() {
               >
                 Logout
               </button>
+            </>
+          ) : isGuest ? (
+            <>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-slate-700">
+                Guest checkout is active. Keep shopping, or sign in to save this cart to an account.
+              </div>
+              <Link
+                className="block rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={closeAccountPanel}
+                to="/guest-checkout"
+              >
+                Guest Checkout
+              </Link>
+              <Link
+                className="block rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={closeAccountPanel}
+                to="/login"
+              >
+                Login
+              </Link>
+              <Link
+                className="block rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+                onClick={closeAccountPanel}
+                to="/register"
+              >
+                Register
+              </Link>
             </>
           ) : (
             <>
