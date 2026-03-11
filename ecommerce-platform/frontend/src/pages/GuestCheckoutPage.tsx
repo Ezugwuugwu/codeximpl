@@ -5,6 +5,12 @@ import { orderApi } from "../services/api";
 import type { GuestOrderCustomer } from "../types";
 import { activateGuestSession, getAuthSession } from "../utils/auth";
 import {
+  formatAddressSuggestion,
+  getEmailSuggestion,
+  isValidEmail,
+  isValidStreetAddress,
+} from "../utils/contactValidation";
+import {
   clearGuestCart,
   getGuestCartSubtotal,
   readGuestCart,
@@ -50,6 +56,8 @@ function GuestCheckoutPage() {
 
   const subtotal = useMemo(() => getGuestCartSubtotal(items), [items]);
   const customerComplete = Object.values(customer).every((value) => value.trim().length > 0);
+  const emailSuggestion = useMemo(() => getEmailSuggestion(customer.email), [customer.email]);
+  const addressSuggestion = useMemo(() => formatAddressSuggestion(customer.streetAddress), [customer.streetAddress]);
 
   const clearCustomFieldValidation = (field: "email" | "streetAddress") => {
     const form = formRef.current;
@@ -77,14 +85,8 @@ function GuestCheckoutPage() {
     addressInput?.setCustomValidity("");
 
     if (form.reportValidity()) {
-      const normalizedEmail = customer.email.trim().toLowerCase();
-      const [localPart = "", domain = ""] = normalizedEmail.split("@");
       const normalizedAddress = customer.streetAddress.trim();
-
-      const invalidEmail =
-        !/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(normalizedEmail) ||
-        ((domain === "gmail.com" || domain === "googlemail.com") &&
-          (localPart.startsWith(".") || localPart.endsWith(".") || localPart.includes("..")));
+      const invalidEmail = !isValidEmail(customer.email);
 
       if (invalidEmail) {
         emailInput?.setCustomValidity("Enter a valid email address.");
@@ -245,6 +247,7 @@ function GuestCheckoutPage() {
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>First name</span>
                 <input
+                  autoComplete="given-name"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   minLength={2}
                   pattern="[A-Za-z][A-Za-z' -]{1,}"
@@ -258,6 +261,7 @@ function GuestCheckoutPage() {
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>Last name</span>
                 <input
+                  autoComplete="family-name"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   minLength={2}
                   pattern="[A-Za-z][A-Za-z' -]{1,}"
@@ -273,6 +277,7 @@ function GuestCheckoutPage() {
             <label className="space-y-2 text-sm font-medium text-slate-700">
               <span>Email address</span>
               <input
+                autoComplete="email"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                 name="guest-email"
                 required
@@ -281,11 +286,21 @@ function GuestCheckoutPage() {
                 value={customer.email}
                 onChange={(event) => updateField("email", event.target.value)}
               />
+              {emailSuggestion && (
+                <button
+                  className="text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => updateField("email", emailSuggestion)}
+                  type="button"
+                >
+                  Use suggested email: {emailSuggestion}
+                </button>
+              )}
             </label>
 
             <label className="space-y-2 text-sm font-medium text-slate-700">
               <span>Street address</span>
               <textarea
+                autoComplete="street-address"
                 className="min-h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                 minLength={10}
                 name="guest-street-address"
@@ -294,12 +309,22 @@ function GuestCheckoutPage() {
                 value={customer.streetAddress}
                 onChange={(event) => updateField("streetAddress", event.target.value)}
               />
+              {addressSuggestion && (
+                <button
+                  className="text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => updateField("streetAddress", addressSuggestion)}
+                  type="button"
+                >
+                  Use suggested address: {addressSuggestion}
+                </button>
+              )}
             </label>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>City</span>
                 <input
+                  autoComplete="address-level2"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   minLength={2}
                   pattern="[A-Za-z][A-Za-z .'-]{1,}"
@@ -313,6 +338,7 @@ function GuestCheckoutPage() {
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>State</span>
                 <input
+                  autoComplete="address-level1"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   minLength={2}
                   pattern="[A-Za-z][A-Za-z .'-]{1,}"
@@ -329,6 +355,7 @@ function GuestCheckoutPage() {
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>Postal code</span>
                 <input
+                  autoComplete="postal-code"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   pattern="[A-Za-z0-9][A-Za-z0-9 -]{2,11}"
                   required
@@ -341,6 +368,7 @@ function GuestCheckoutPage() {
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>Country</span>
                 <input
+                  autoComplete="country-name"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   minLength={2}
                   pattern="[A-Za-z][A-Za-z .'-]{1,}"

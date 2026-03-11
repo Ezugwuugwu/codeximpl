@@ -1,6 +1,12 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { userApi } from "../../services/api";
 import type { UserAddress, UserAddressUpsertRequest } from "../../types";
+import {
+  formatAddressSuggestion,
+  formatPlaceSuggestion,
+  getPostalCodeSuggestion,
+  isValidStreetAddress,
+} from "../../utils/contactValidation";
 
 type AddressBookSectionProps = {
   token: string;
@@ -26,6 +32,7 @@ function formatAddress(address: UserAddress): string[] {
 }
 
 function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionProps) {
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,6 +47,11 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
     () => addresses.find((address) => address.id === editingAddressId) ?? null,
     [addresses, editingAddressId]
   );
+  const streetSuggestion = useMemo(() => formatAddressSuggestion(form.streetAddress), [form.streetAddress]);
+  const citySuggestion = useMemo(() => formatPlaceSuggestion(form.city), [form.city]);
+  const stateSuggestion = useMemo(() => formatPlaceSuggestion(form.state), [form.state]);
+  const countrySuggestion = useMemo(() => formatPlaceSuggestion(form.country), [form.country]);
+  const postalCodeSuggestion = useMemo(() => getPostalCodeSuggestion(form.postalCode), [form.postalCode]);
 
   const focusAddressForm = () => {
     window.setTimeout(() => {
@@ -109,8 +121,17 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
     setError("");
     setSuccess("");
 
+    const formElement = formRef.current;
+    if (formElement && !formElement.reportValidity()) {
+      setError("Please correct the highlighted address fields.");
+      return;
+    }
     if (!form.label.trim() || !form.streetAddress.trim() || !form.city.trim() || !form.state.trim() || !form.country.trim()) {
       setError("Label, street address, city, state, and country are required.");
+      return;
+    }
+    if (!isValidStreetAddress(form.streetAddress)) {
+      setError("Enter a complete delivery address.");
       return;
     }
 
@@ -220,7 +241,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
       {success && <p className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p>}
 
       {isFormOpen && (
-        <form className="mt-5 space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5" onSubmit={onSubmit}>
+        <form className="mt-5 space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5" onSubmit={onSubmit} ref={formRef}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">
@@ -245,6 +266,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 Label
               </label>
               <input
+                autoComplete="organization"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-label"
                 maxLength={80}
@@ -260,13 +282,26 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 Country
               </label>
               <input
+                autoComplete="country-name"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-country"
                 maxLength={120}
+                minLength={2}
+                pattern="[A-Za-z][A-Za-z .'-]{1,}"
+                title="Enter a valid country."
                 type="text"
                 value={form.country}
                 onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))}
               />
+              {countrySuggestion && (
+                <button
+                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => setForm((current) => ({ ...current, country: countrySuggestion }))}
+                  type="button"
+                >
+                  Use suggested country: {countrySuggestion}
+                </button>
+              )}
             </div>
           </div>
 
@@ -275,12 +310,25 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               Street address
             </label>
             <textarea
+              autoComplete="street-address"
               className="min-h-[110px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
               id="address-street"
               maxLength={255}
+              minLength={10}
+              required
+              title="Enter a complete delivery address."
               value={form.streetAddress}
               onChange={(event) => setForm((current) => ({ ...current, streetAddress: event.target.value }))}
             />
+            {streetSuggestion && (
+              <button
+                className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                onClick={() => setForm((current) => ({ ...current, streetAddress: streetSuggestion }))}
+                type="button"
+              >
+                Use suggested address: {streetSuggestion}
+              </button>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -289,13 +337,27 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 City
               </label>
               <input
+                autoComplete="address-level2"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-city"
                 maxLength={120}
+                minLength={2}
+                pattern="[A-Za-z][A-Za-z .'-]{1,}"
+                required
+                title="Enter a valid city."
                 type="text"
                 value={form.city}
                 onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
               />
+              {citySuggestion && (
+                <button
+                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => setForm((current) => ({ ...current, city: citySuggestion }))}
+                  type="button"
+                >
+                  Use suggested city: {citySuggestion}
+                </button>
+              )}
             </div>
 
             <div>
@@ -303,13 +365,27 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 State
               </label>
               <input
+                autoComplete="address-level1"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-state"
                 maxLength={120}
+                minLength={2}
+                pattern="[A-Za-z][A-Za-z .'-]{1,}"
+                required
+                title="Enter a valid state or province."
                 type="text"
                 value={form.state}
                 onChange={(event) => setForm((current) => ({ ...current, state: event.target.value }))}
               />
+              {stateSuggestion && (
+                <button
+                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => setForm((current) => ({ ...current, state: stateSuggestion }))}
+                  type="button"
+                >
+                  Use suggested state: {stateSuggestion}
+                </button>
+              )}
             </div>
 
             <div>
@@ -317,13 +393,25 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 Postal code
               </label>
               <input
+                autoComplete="postal-code"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-postal-code"
                 maxLength={40}
+                pattern="[A-Za-z0-9][A-Za-z0-9 -]{2,11}"
+                title="Enter a valid postal code."
                 type="text"
                 value={form.postalCode}
                 onChange={(event) => setForm((current) => ({ ...current, postalCode: event.target.value }))}
               />
+              {postalCodeSuggestion && (
+                <button
+                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => setForm((current) => ({ ...current, postalCode: postalCodeSuggestion }))}
+                  type="button"
+                >
+                  Use suggested postal code: {postalCodeSuggestion}
+                </button>
+              )}
             </div>
           </div>
 

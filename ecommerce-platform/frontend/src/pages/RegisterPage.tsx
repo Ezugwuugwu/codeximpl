@@ -1,11 +1,13 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "../services/api";
 import { activateGuestSession, buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
+import { formatAddressSuggestion, getEmailSuggestion, isValidEmail, isValidStreetAddress } from "../utils/contactValidation";
 import { hasGuestCartItems } from "../utils/guestCart";
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [searchParams] = useSearchParams();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -31,13 +33,28 @@ function RegisterPage() {
         : "Create an account or sign in first to add items to your cart."
       : "";
   const guestCheckoutAvailable = hasGuestCartItems();
+  const emailSuggestion = useMemo(() => getEmailSuggestion(email), [email]);
+  const addressSuggestion = useMemo(() => formatAddressSuggestion(address), [address]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
 
+    const form = formRef.current;
+    if (form && !form.reportValidity()) {
+      setError("Please correct the highlighted fields.");
+      return;
+    }
     if (!firstName.trim() || !lastName.trim() || !address.trim()) {
       setError("First name, last name, and address are required.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    if (!isValidStreetAddress(address)) {
+      setError("Enter a complete delivery address.");
       return;
     }
     if (password !== confirmPassword) {
@@ -101,7 +118,7 @@ function RegisterPage() {
           </Link>
         )}
 
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form className="space-y-4" onSubmit={onSubmit} ref={formRef}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="firstName">
@@ -111,8 +128,11 @@ function RegisterPage() {
                 autoComplete="given-name"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                 id="firstName"
+                minLength={2}
+                pattern="[A-Za-z][A-Za-z' -]{1,}"
                 placeholder="Jane"
                 required
+                title="Enter a valid first name."
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -127,8 +147,11 @@ function RegisterPage() {
                 autoComplete="family-name"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                 id="lastName"
+                minLength={2}
+                pattern="[A-Za-z][A-Za-z' -]{1,}"
                 placeholder="Doe"
                 required
+                title="Enter a valid last name."
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -140,33 +163,54 @@ function RegisterPage() {
             <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address">
               Address
             </label>
-            <input
-              autoComplete="street-address"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-              id="address"
-              placeholder="123 Main St, City, State"
-              required
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-          </div>
+              <input
+                autoComplete="street-address"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                id="address"
+                minLength={10}
+                placeholder="123 Main St, City, State"
+                required
+                title="Enter a complete delivery address."
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+              {addressSuggestion && (
+                <button
+                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => setAddress(addressSuggestion)}
+                  type="button"
+                >
+                  Use suggested address: {addressSuggestion}
+                </button>
+              )}
+            </div>
 
-          <div>
+            <div>
             <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="email">
               Email address
             </label>
-            <input
-              autoComplete="email"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
-              id="email"
-              placeholder="you@example.com"
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+              <input
+                autoComplete="email"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                id="email"
+                placeholder="you@example.com"
+                required
+                title="Enter a valid email address."
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              {emailSuggestion && (
+                <button
+                  className="mt-2 text-left text-xs font-medium text-sky-700 underline underline-offset-2"
+                  onClick={() => setEmail(emailSuggestion)}
+                  type="button"
+                >
+                  Use suggested email: {emailSuggestion}
+                </button>
+              )}
+            </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="password">
