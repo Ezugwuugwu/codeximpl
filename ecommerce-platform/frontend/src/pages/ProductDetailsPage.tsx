@@ -311,7 +311,7 @@ function ProductDetailsPage() {
           <h2 className="text-3xl font-semibold">{product.name}</h2>
           <RatingDisplay rating={rating} reviewCount={reviewCount} />
           <p className="text-sm leading-6 text-slate-600">{product.description}</p>
-          <p className="text-3xl font-bold text-emerald-700">NGN {Number(product.price).toFixed(2)}</p>
+          <p className="text-[24px] font-bold leading-none text-emerald-700">NGN {Number(product.price).toFixed(2)}</p>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <p><span className="text-slate-500">Stock:</span> {product.stock}</p>
@@ -342,14 +342,14 @@ function ProductDetailsPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button className="rounded-xl bg-ink px-5 py-2 text-white disabled:opacity-50" disabled={quantity === 0} onClick={addItem} type="button">
+            <button className="rounded-xl bg-ink px-5 py-2 text-sm text-white disabled:opacity-50" disabled={quantity === 0} onClick={addItem} type="button">
               Add to Cart
             </button>
-            <button className="rounded-xl bg-mint px-5 py-2 font-medium text-ink disabled:opacity-50" disabled={quantity === 0} onClick={addAndCheckout} type="button">
+            <button className="rounded-xl bg-mint px-5 py-2 text-sm font-medium text-ink disabled:opacity-50" disabled={quantity === 0} onClick={addAndCheckout} type="button">
               Buy Now
             </button>
             <button
-              className="rounded-xl border border-slate-300 px-5 py-2 text-slate-700 disabled:opacity-50"
+              className="rounded-xl border border-slate-300 px-5 py-2 text-sm text-slate-700 disabled:opacity-50"
               disabled={quantity < 0}
               onClick={updateCartQuantity}
               type="button"
