@@ -63,7 +63,15 @@ function GuestCheckoutPage() {
   }, []);
 
   const subtotal = useMemo(() => getGuestCartSubtotal(items), [items]);
-  const customerComplete = Object.values(customer).every((value) => value.trim().length > 0);
+  const customerComplete = [
+    customer.firstName,
+    customer.lastName,
+    customer.email,
+    customer.streetAddress,
+    customer.city,
+    customer.state,
+    customer.country,
+  ].every((value) => value.trim().length > 0);
   const emailSuggestion = useMemo(() => getEmailSuggestion(customer.email), [customer.email]);
 
   const clearCustomFieldValidation = (field: "email" | "streetAddress") => {
@@ -376,7 +384,6 @@ function GuestCheckoutPage() {
                   autoComplete="postal-code"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-ink focus:outline-none"
                   pattern="[A-Za-z0-9][A-Za-z0-9 -]{2,11}"
-                  required
                   title="Enter a valid postal code."
                   type="text"
                   value={customer.postalCode}

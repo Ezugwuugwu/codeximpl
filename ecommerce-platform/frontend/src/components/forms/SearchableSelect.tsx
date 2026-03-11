@@ -76,12 +76,18 @@ function SearchableSelect({
     }
   }, [disabled]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setIsOpen(false);
+    }
+  }, [value]);
+
   const openDropdown = () => {
     if (disabled) {
       return;
     }
     setQuery("");
-    setIsOpen(true);
+    setIsOpen((current) => !current);
   };
 
   const handleSelect = (nextValue: string) => {
@@ -102,9 +108,9 @@ function SearchableSelect({
         type="button"
       >
         <span className={value ? "text-slate-700" : "text-slate-400"}>{value || placeholder}</span>
-        <span aria-hidden="true" className="ml-3 text-xs text-slate-400">
-          v
-        </span>
+        <svg aria-hidden="true" className="ml-3 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 20 20">
+          <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        </svg>
       </button>
 
       {isOpen && (
@@ -129,6 +135,7 @@ function SearchableSelect({
                       option === value ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
                     }`}
                     key={option}
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => handleSelect(option)}
                     type="button"
                   >
