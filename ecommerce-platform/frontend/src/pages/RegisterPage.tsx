@@ -5,6 +5,7 @@ import { authApi } from "../services/api";
 import { activateGuestSession, buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
 import { getEmailSuggestion, isValidEmail, isValidStreetAddress } from "../utils/contactValidation";
 import { hasGuestCartItems } from "../utils/guestCart";
+import { getMatchingLocationOptions } from "../utils/locationSearch";
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ function RegisterPage() {
     () => [streetAddress.trim(), city.trim(), state.trim(), country.trim()].filter(Boolean).join(", "),
     [city, country, state, streetAddress]
   );
-  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading, locationError } = useLocationDirectory(country, state);
+  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading } = useLocationDirectory(country, state);
   const {
     suggestions: streetSuggestions,
   } = useStreetAddressSuggestions(streetAddress, {
@@ -50,6 +51,18 @@ function RegisterPage() {
     state,
     city,
   });
+  const countryOptions = useMemo(
+    () => getMatchingLocationOptions(countries.map((countryOption) => countryOption.name), country, 20),
+    [countries, country]
+  );
+  const stateOptions = useMemo(
+    () => getMatchingLocationOptions(states.map((stateOption) => stateOption.name), state, 20),
+    [states, state]
+  );
+  const cityOptions = useMemo(
+    () => getMatchingLocationOptions(cities, city, 25),
+    [cities, city]
+  );
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -205,80 +218,83 @@ function RegisterPage() {
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-country">
                 Country
               </label>
-              <select
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={countriesLoading || countries.length === 0}
+              <input
+                autoComplete="country-name"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none"
                 id="register-country"
+                list="register-country-options"
+                placeholder={countriesLoading ? "Loading countries..." : "Type to search country"}
                 required
+                type="text"
                 value={country}
                 onChange={(event) => {
                   setCountry(event.target.value);
                   setState("");
                   setCity("");
                 }}
-              >
-                <option value="">{countriesLoading ? "Loading countries..." : "Select country"}</option>
-                {countries.map((countryOption) => (
-                  <option key={countryOption.iso2 || countryOption.name} value={countryOption.name}>
-                    {countryOption.name}
-                  </option>
+              />
+              <datalist id="register-country-options">
+                {countryOptions.map((countryOption) => (
+                  <option key={countryOption} value={countryOption} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-state">
                 State / Region
               </label>
-              <select
+              <input
+                autoComplete="address-level1"
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!country || statesLoading || states.length === 0}
+                disabled={!country}
                 id="register-state"
+                list="register-state-options"
+                placeholder={!country ? "Enter country first" : statesLoading ? "Loading states..." : "Type to search state"}
                 required
+                type="text"
                 value={state}
                 onChange={(event) => {
                   setState(event.target.value);
                   setCity("");
                 }}
-              >
-                <option value="">
-                  {!country ? "Select country first" : statesLoading ? "Loading states..." : "Select state"}
-                </option>
-                {states.map((stateOption) => (
-                  <option key={`${stateOption.code}-${stateOption.name}`} value={stateOption.name}>
-                    {stateOption.name}
-                  </option>
+              />
+              <datalist id="register-state-options">
+                {stateOptions.map((stateOption) => (
+                  <option key={stateOption} value={stateOption} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-city">
                 City
               </label>
-              <select
+              <input
+                autoComplete="address-level2"
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!country || !state || citiesLoading || cities.length === 0}
+                disabled={!country || !state}
                 id="register-city"
-                required
-                value={city}
-                onChange={(event) => setCity(event.target.value)}
-              >
-                <option value="">
-                  {!country
-                    ? "Select country first"
+                list="register-city-options"
+                placeholder={
+                  !country
+                    ? "Enter country first"
                     : !state
-                      ? "Select state first"
+                      ? "Enter state first"
                       : citiesLoading
                         ? "Loading cities..."
-                        : "Select city"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption} value={cityOption}>
-                    {cityOption}
-                  </option>
+                        : "Type to search city"
+                }
+                required
+                type="text"
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+              />
+              <datalist id="register-city-options">
+                {cityOptions.map((cityOption) => (
+                  <option key={cityOption} value={cityOption} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div className="sm:col-span-3">
@@ -318,10 +334,6 @@ function RegisterPage() {
               {composedAddress && <p className="mt-2 text-xs text-slate-500">Address on the account: {composedAddress}</p>}
             </div>
           </div>
-
-          {locationError && (
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">{locationError}</p>
-          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="password">

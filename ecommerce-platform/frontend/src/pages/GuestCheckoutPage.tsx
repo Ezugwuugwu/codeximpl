@@ -6,6 +6,7 @@ import { orderApi } from "../services/api";
 import type { GuestOrderCustomer } from "../types";
 import { activateGuestSession, getAuthSession } from "../utils/auth";
 import { getEmailSuggestion, isValidEmail, isValidStreetAddress } from "../utils/contactValidation";
+import { getMatchingLocationOptions } from "../utils/locationSearch";
 import {
   clearGuestCart,
   getGuestCartSubtotal,
@@ -35,7 +36,7 @@ function GuestCheckoutPage() {
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [placing, setPlacing] = useState(false);
   const [latestOrderId, setLatestOrderId] = useState<string | null>(null);
-  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading, locationError } = useLocationDirectory(
+  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading } = useLocationDirectory(
     customer.country,
     customer.state
   );
@@ -64,6 +65,18 @@ function GuestCheckoutPage() {
   const subtotal = useMemo(() => getGuestCartSubtotal(items), [items]);
   const customerComplete = Object.values(customer).every((value) => value.trim().length > 0);
   const emailSuggestion = useMemo(() => getEmailSuggestion(customer.email), [customer.email]);
+  const countryOptions = useMemo(
+    () => getMatchingLocationOptions(countries.map((country) => country.name), customer.country, 20),
+    [countries, customer.country]
+  );
+  const stateOptions = useMemo(
+    () => getMatchingLocationOptions(states.map((state) => state.name), customer.state, 20),
+    [states, customer.state]
+  );
+  const cityOptions = useMemo(
+    () => getMatchingLocationOptions(cities, customer.city, 25),
+    [cities, customer.city]
+  );
 
   const clearCustomFieldValidation = (field: "email" | "streetAddress") => {
     const form = formRef.current;
@@ -329,65 +342,67 @@ function GuestCheckoutPage() {
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="space-y-2 text-sm font-medium text-slate-700 sm:col-span-3">
                 <span>Country</span>
-                <select
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                  disabled={countriesLoading || countries.length === 0}
+                <input
+                  autoComplete="country-name"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none"
+                  list="guest-country-options"
+                  placeholder={countriesLoading ? "Loading countries..." : "Type to search country"}
                   required
+                  type="text"
                   value={customer.country}
                   onChange={(event) => updateCountry(event.target.value)}
-                >
-                  <option value="">{countriesLoading ? "Loading countries..." : "Select country"}</option>
-                  {countries.map((country) => (
-                    <option key={country.iso2 || country.name} value={country.name}>
-                      {country.name}
-                    </option>
+                />
+                <datalist id="guest-country-options">
+                  {countryOptions.map((country) => (
+                    <option key={country} value={country} />
                   ))}
-                </select>
-                <p className="text-xs text-slate-500">Choose the delivery country first. States and cities are filtered from this selection.</p>
+                </datalist>
               </label>
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>State / Region</span>
-                <select
+                <input
+                  autoComplete="address-level1"
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                  disabled={!customer.country || statesLoading || states.length === 0}
+                  disabled={!customer.country}
+                  list="guest-state-options"
+                  placeholder={!customer.country ? "Enter country first" : statesLoading ? "Loading states..." : "Type to search state"}
                   required
+                  type="text"
                   value={customer.state}
                   onChange={(event) => updateState(event.target.value)}
-                >
-                  <option value="">
-                    {!customer.country ? "Select country first" : statesLoading ? "Loading states..." : "Select state"}
-                  </option>
-                  {states.map((state) => (
-                    <option key={`${state.code}-${state.name}`} value={state.name}>
-                      {state.name}
-                    </option>
+                />
+                <datalist id="guest-state-options">
+                  {stateOptions.map((state) => (
+                    <option key={state} value={state} />
                   ))}
-                </select>
+                </datalist>
               </label>
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>City</span>
-                <select
+                <input
+                  autoComplete="address-level2"
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                  disabled={!customer.country || !customer.state || citiesLoading || cities.length === 0}
-                  required
-                  value={customer.city}
-                  onChange={(event) => updateField("city", event.target.value)}
-                >
-                  <option value="">
-                    {!customer.country
-                      ? "Select country first"
+                  disabled={!customer.country || !customer.state}
+                  list="guest-city-options"
+                  placeholder={
+                    !customer.country
+                      ? "Enter country first"
                       : !customer.state
-                        ? "Select state first"
+                        ? "Enter state first"
                         : citiesLoading
                           ? "Loading cities..."
-                          : "Select city"}
-                  </option>
-                  {cities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
+                          : "Type to search city"
+                  }
+                  required
+                  type="text"
+                  value={customer.city}
+                  onChange={(event) => updateField("city", event.target.value)}
+                />
+                <datalist id="guest-city-options">
+                  {cityOptions.map((city) => (
+                    <option key={city} value={city} />
                   ))}
-                </select>
+                </datalist>
               </label>
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 <span>Postal code</span>
@@ -438,7 +453,6 @@ function GuestCheckoutPage() {
               )}
             </label>
 
-            {locationError && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">{locationError}</p>}
           </form>
 
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">

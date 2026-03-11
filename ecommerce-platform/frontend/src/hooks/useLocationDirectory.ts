@@ -90,7 +90,10 @@ export function useLocationDirectory(country: string, state: string) {
 
   useEffect(() => {
     let active = true;
-    if (!country.trim() || !state.trim()) {
+    const normalizedState = state.trim().toLowerCase();
+    const hasExactStateMatch = states.some((option) => option.name.trim().toLowerCase() === normalizedState);
+
+    if (!country.trim() || !state.trim() || !hasExactStateMatch) {
       setCities([]);
       setCitiesLoading(false);
       return () => {
@@ -124,7 +127,7 @@ export function useLocationDirectory(country: string, state: string) {
     return () => {
       active = false;
     };
-  }, [country, state]);
+  }, [country, state, states]);
 
   return {
     countries,

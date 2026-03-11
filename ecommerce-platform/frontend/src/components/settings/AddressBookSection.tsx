@@ -3,6 +3,7 @@ import { useLocationDirectory, useStreetAddressSuggestions } from "../../hooks/u
 import { userApi } from "../../services/api";
 import type { UserAddress, UserAddressUpsertRequest } from "../../types";
 import { isValidStreetAddress } from "../../utils/contactValidation";
+import { getMatchingLocationOptions } from "../../utils/locationSearch";
 
 type AddressBookSectionProps = {
   token: string;
@@ -37,7 +38,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
   const [form, setForm] = useState<UserAddressUpsertRequest>(emptyForm);
-  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading, locationError } = useLocationDirectory(
+  const { countries, states, cities, countriesLoading, statesLoading, citiesLoading } = useLocationDirectory(
     form.country,
     form.state
   );
@@ -53,6 +54,18 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
   const activeAddress = useMemo(
     () => addresses.find((address) => address.id === editingAddressId) ?? null,
     [addresses, editingAddressId]
+  );
+  const countryOptions = useMemo(
+    () => getMatchingLocationOptions(countries.map((country) => country.name), form.country, 20),
+    [countries, form.country]
+  );
+  const stateOptions = useMemo(
+    () => getMatchingLocationOptions(states.map((state) => state.name), form.state, 20),
+    [states, form.state]
+  );
+  const cityOptions = useMemo(
+    () => getMatchingLocationOptions(cities, form.city, 25),
+    [cities, form.city]
   );
 
   const focusAddressForm = () => {
@@ -306,22 +319,22 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
 
             <label className="sm:col-span-2" htmlFor="address-country">
               <span className="mb-1 block text-sm font-medium text-slate-700">Country</span>
-              <select
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={countriesLoading || countries.length === 0}
+              <input
+                autoComplete="country-name"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
                 id="address-country"
+                list="address-country-options"
+                placeholder={countriesLoading ? "Loading countries..." : "Type to search country"}
                 required
+                type="text"
                 value={form.country}
                 onChange={(event) => updateCountry(event.target.value)}
-              >
-                <option value="">{countriesLoading ? "Loading countries..." : "Select country"}</option>
-                {countries.map((country) => (
-                  <option key={country.iso2 || country.name} value={country.name}>
-                    {country.name}
-                  </option>
+              />
+              <datalist id="address-country-options">
+                {countryOptions.map((country) => (
+                  <option key={country} value={country} />
                 ))}
-              </select>
-              <p className="mt-2 text-xs text-slate-500">Choose the delivery country first. The state and city lists are loaded from that country.</p>
+              </datalist>
             </label>
           </div>
 
@@ -330,52 +343,54 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-state">
                 State / Region
               </label>
-              <select
+              <input
+                autoComplete="address-level1"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!form.country || statesLoading || states.length === 0}
+                disabled={!form.country}
                 id="address-state"
+                list="address-state-options"
+                placeholder={!form.country ? "Enter country first" : statesLoading ? "Loading states..." : "Type to search state"}
                 required
+                type="text"
                 value={form.state}
                 onChange={(event) => updateState(event.target.value)}
-              >
-                <option value="">
-                  {!form.country ? "Select country first" : statesLoading ? "Loading states..." : "Select state"}
-                </option>
-                {states.map((state) => (
-                  <option key={`${state.code}-${state.name}`} value={state.name}>
-                    {state.name}
-                  </option>
+              />
+              <datalist id="address-state-options">
+                {stateOptions.map((state) => (
+                  <option key={state} value={state} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-city">
                 City
               </label>
-              <select
+              <input
+                autoComplete="address-level2"
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!form.country || !form.state || citiesLoading || cities.length === 0}
+                disabled={!form.country || !form.state}
                 id="address-city"
-                required
-                value={form.city}
-                onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
-              >
-                <option value="">
-                  {!form.country
-                    ? "Select country first"
+                list="address-city-options"
+                placeholder={
+                  !form.country
+                    ? "Enter country first"
                     : !form.state
-                      ? "Select state first"
+                      ? "Enter state first"
                       : citiesLoading
                         ? "Loading cities..."
-                        : "Select city"}
-                </option>
-                {cities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
+                        : "Type to search city"
+                }
+                required
+                type="text"
+                value={form.city}
+                onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
+              />
+              <datalist id="address-city-options">
+                {cityOptions.map((city) => (
+                  <option key={city} value={city} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div>
@@ -432,8 +447,6 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               </div>
             )}
           </div>
-
-          {locationError && <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">{locationError}</p>}
 
           <label className="flex items-center gap-3 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
             <input
