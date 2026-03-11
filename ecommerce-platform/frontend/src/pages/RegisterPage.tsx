@@ -45,8 +45,6 @@ function RegisterPage() {
   const { countries, states, cities, countriesLoading, statesLoading, citiesLoading, locationError } = useLocationDirectory(country, state);
   const {
     suggestions: streetSuggestions,
-    loading: streetSuggestionsLoading,
-    error: streetSuggestionsError,
   } = useStreetAddressSuggestions(streetAddress, {
     country,
     state,
@@ -299,11 +297,7 @@ function RegisterPage() {
                 value={streetAddress}
                 onChange={(event) => setStreetAddress(event.target.value)}
               />
-              <p className="mt-2 text-xs text-slate-500">
-                Address suggestions are matched to the selected country{state ? `, ${state}` : ""}{city ? `, ${city}` : ""}.
-              </p>
-              {streetSuggestionsLoading && <p className="mt-2 text-xs text-slate-500">Searching matching addresses...</p>}
-              {!streetSuggestionsLoading && streetSuggestions.length > 0 && (
+              {streetSuggestions.length > 0 && (
                 <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
                   <p className="px-2 pb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Suggested matches</p>
                   <div className="space-y-1">
@@ -318,13 +312,9 @@ function RegisterPage() {
                         <span className="block text-xs text-slate-500">{suggestion.label}</span>
                       </button>
                     ))}
-                  </div>
                 </div>
-              )}
-              {!streetSuggestionsLoading && !streetSuggestionsError && streetAddress.trim().length >= 3 && streetSuggestions.length === 0 && (
-                <p className="mt-2 text-xs text-slate-500">No matching addresses found for this location yet. Keep typing to refine the search.</p>
-              )}
-              {streetSuggestionsError && <p className="mt-2 text-xs text-amber-700">{streetSuggestionsError}</p>}
+              </div>
+            )}
               {composedAddress && <p className="mt-2 text-xs text-slate-500">Address on the account: {composedAddress}</p>}
             </div>
           </div>

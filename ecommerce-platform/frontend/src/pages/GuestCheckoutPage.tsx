@@ -41,8 +41,6 @@ function GuestCheckoutPage() {
   );
   const {
     suggestions: streetSuggestions,
-    loading: streetSuggestionsLoading,
-    error: streetSuggestionsError,
   } = useStreetAddressSuggestions(customer.streetAddress, {
     country: customer.country,
     state: customer.state,
@@ -420,11 +418,7 @@ function GuestCheckoutPage() {
                 value={customer.streetAddress}
                 onChange={(event) => updateField("streetAddress", event.target.value)}
               />
-              <p className="text-xs text-slate-500">
-                Street suggestions are matched to the selected country{customer.state ? `, ${customer.state}` : ""}{customer.city ? `, ${customer.city}` : ""}.
-              </p>
-              {streetSuggestionsLoading && <p className="text-xs text-slate-500">Searching matching addresses...</p>}
-              {!streetSuggestionsLoading && streetSuggestions.length > 0 && (
+              {streetSuggestions.length > 0 && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-2">
                   <p className="px-2 pb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Suggested matches</p>
                   <div className="space-y-1">
@@ -442,10 +436,6 @@ function GuestCheckoutPage() {
                   </div>
                 </div>
               )}
-              {!streetSuggestionsLoading && !streetSuggestionsError && customer.streetAddress.trim().length >= 3 && streetSuggestions.length === 0 && (
-                <p className="text-xs text-slate-500">No matching addresses found for this location yet. Keep typing to refine the search.</p>
-              )}
-              {streetSuggestionsError && <p className="text-xs text-amber-700">{streetSuggestionsError}</p>}
             </label>
 
             {locationError && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">{locationError}</p>}

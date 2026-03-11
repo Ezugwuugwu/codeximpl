@@ -43,8 +43,6 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
   );
   const {
     suggestions: streetSuggestions,
-    loading: streetSuggestionsLoading,
-    error: streetSuggestionsError,
   } = useStreetAddressSuggestions(form.streetAddress, {
     country: form.country,
     state: form.state,
@@ -415,11 +413,7 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               value={form.streetAddress}
               onChange={(event) => setForm((current) => ({ ...current, streetAddress: event.target.value }))}
             />
-            <p className="mt-2 text-xs text-slate-500">
-              Street suggestions are scoped to the selected country{form.state ? `, ${form.state}` : ""}{form.city ? `, ${form.city}` : ""}.
-            </p>
-            {streetSuggestionsLoading && <p className="mt-2 text-xs text-slate-500">Searching matching addresses...</p>}
-            {!streetSuggestionsLoading && streetSuggestions.length > 0 && (
+            {streetSuggestions.length > 0 && (
               <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-2">
                 <p className="px-2 pb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Suggested matches</p>
                 <div className="space-y-1">
@@ -437,10 +431,6 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
                 </div>
               </div>
             )}
-            {!streetSuggestionsLoading && !streetSuggestionsError && form.streetAddress.trim().length >= 3 && streetSuggestions.length === 0 && (
-              <p className="mt-2 text-xs text-slate-500">No matching addresses found for this location yet. Keep typing to refine the search.</p>
-            )}
-            {streetSuggestionsError && <p className="mt-2 text-xs text-amber-700">{streetSuggestionsError}</p>}
           </div>
 
           {locationError && <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">{locationError}</p>}
