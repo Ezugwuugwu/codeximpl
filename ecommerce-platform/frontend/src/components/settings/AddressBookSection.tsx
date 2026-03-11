@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import SearchableSelect from "../forms/SearchableSelect";
 import { useLocationDirectory, useStreetAddressSuggestions } from "../../hooks/useLocationDirectory";
 import { userApi } from "../../services/api";
 import type { UserAddress, UserAddressUpsertRequest } from "../../types";
 import { isValidStreetAddress } from "../../utils/contactValidation";
-import { getMatchingLocationOptions } from "../../utils/locationSearch";
 
 type AddressBookSectionProps = {
   token: string;
@@ -54,18 +54,6 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
   const activeAddress = useMemo(
     () => addresses.find((address) => address.id === editingAddressId) ?? null,
     [addresses, editingAddressId]
-  );
-  const countryOptions = useMemo(
-    () => getMatchingLocationOptions(countries.map((country) => country.name), form.country, 20),
-    [countries, form.country]
-  );
-  const stateOptions = useMemo(
-    () => getMatchingLocationOptions(states.map((state) => state.name), form.state, 20),
-    [states, form.state]
-  );
-  const cityOptions = useMemo(
-    () => getMatchingLocationOptions(cities, form.city, 25),
-    [cities, form.city]
   );
 
   const focusAddressForm = () => {
@@ -319,22 +307,17 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
 
             <label className="sm:col-span-2" htmlFor="address-country">
               <span className="mb-1 block text-sm font-medium text-slate-700">Country</span>
-              <input
-                autoComplete="country-name"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none"
+              <SearchableSelect
+                disabled={countriesLoading || countries.length === 0}
                 id="address-country"
-                list="address-country-options"
-                placeholder={countriesLoading ? "Loading countries..." : "Type to search country"}
-                required
-                type="text"
+                loading={countriesLoading}
+                noOptionsLabel="No countries found."
+                onChange={updateCountry}
+                options={countries.map((country) => country.name)}
+                placeholder="Select country"
+                searchPlaceholder="Search country"
                 value={form.country}
-                onChange={(event) => updateCountry(event.target.value)}
               />
-              <datalist id="address-country-options">
-                {countryOptions.map((country) => (
-                  <option key={country} value={country} />
-                ))}
-              </datalist>
             </label>
           </div>
 
@@ -343,54 +326,34 @@ function AddressBookSection({ token, onAddressesChanged }: AddressBookSectionPro
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-state">
                 State / Region
               </label>
-              <input
-                autoComplete="address-level1"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!form.country}
+              <SearchableSelect
+                disabled={!form.country || statesLoading || states.length === 0}
                 id="address-state"
-                list="address-state-options"
-                placeholder={!form.country ? "Enter country first" : statesLoading ? "Loading states..." : "Type to search state"}
-                required
-                type="text"
+                loading={statesLoading}
+                noOptionsLabel={!form.country ? "Select country first." : "No states found."}
+                onChange={updateState}
+                options={states.map((state) => state.name)}
+                placeholder={!form.country ? "Select country first" : "Select state"}
+                searchPlaceholder="Search state"
                 value={form.state}
-                onChange={(event) => updateState(event.target.value)}
               />
-              <datalist id="address-state-options">
-                {stateOptions.map((state) => (
-                  <option key={state} value={state} />
-                ))}
-              </datalist>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="address-city">
                 City
               </label>
-              <input
-                autoComplete="address-level2"
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!form.country || !form.state}
+              <SearchableSelect
+                disabled={!form.country || !form.state || citiesLoading || cities.length === 0}
                 id="address-city"
-                list="address-city-options"
-                placeholder={
-                  !form.country
-                    ? "Enter country first"
-                    : !form.state
-                      ? "Enter state first"
-                      : citiesLoading
-                        ? "Loading cities..."
-                        : "Type to search city"
-                }
-                required
-                type="text"
+                loading={citiesLoading}
+                noOptionsLabel={!form.state ? "Select state first." : "No cities found."}
+                onChange={(value) => setForm((current) => ({ ...current, city: value }))}
+                options={cities}
+                placeholder={!form.state ? "Select state first" : "Select city"}
+                searchPlaceholder="Search city"
                 value={form.city}
-                onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
               />
-              <datalist id="address-city-options">
-                {cityOptions.map((city) => (
-                  <option key={city} value={city} />
-                ))}
-              </datalist>
             </div>
 
             <div>

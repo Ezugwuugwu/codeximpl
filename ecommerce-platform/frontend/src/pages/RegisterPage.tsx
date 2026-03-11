@@ -1,11 +1,11 @@
 import { FormEvent, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import SearchableSelect from "../components/forms/SearchableSelect";
 import { useLocationDirectory, useStreetAddressSuggestions } from "../hooks/useLocationDirectory";
 import { authApi } from "../services/api";
 import { activateGuestSession, buildAuthEntryPath, sanitizeRedirectTarget } from "../utils/auth";
 import { getEmailSuggestion, isValidEmail, isValidStreetAddress } from "../utils/contactValidation";
 import { hasGuestCartItems } from "../utils/guestCart";
-import { getMatchingLocationOptions } from "../utils/locationSearch";
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -51,18 +51,6 @@ function RegisterPage() {
     state,
     city,
   });
-  const countryOptions = useMemo(
-    () => getMatchingLocationOptions(countries.map((countryOption) => countryOption.name), country, 20),
-    [countries, country]
-  );
-  const stateOptions = useMemo(
-    () => getMatchingLocationOptions(states.map((stateOption) => stateOption.name), state, 20),
-    [states, state]
-  );
-  const cityOptions = useMemo(
-    () => getMatchingLocationOptions(cities, city, 25),
-    [cities, city]
-  );
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -218,83 +206,58 @@ function RegisterPage() {
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-country">
                 Country
               </label>
-              <input
-                autoComplete="country-name"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none"
+              <SearchableSelect
+                disabled={countriesLoading || countries.length === 0}
                 id="register-country"
-                list="register-country-options"
-                placeholder={countriesLoading ? "Loading countries..." : "Type to search country"}
-                required
-                type="text"
-                value={country}
-                onChange={(event) => {
-                  setCountry(event.target.value);
+                loading={countriesLoading}
+                noOptionsLabel="No countries found."
+                onChange={(value) => {
+                  setCountry(value);
                   setState("");
                   setCity("");
                 }}
+                options={countries.map((countryOption) => countryOption.name)}
+                placeholder="Select country"
+                searchPlaceholder="Search country"
+                value={country}
               />
-              <datalist id="register-country-options">
-                {countryOptions.map((countryOption) => (
-                  <option key={countryOption} value={countryOption} />
-                ))}
-              </datalist>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-state">
                 State / Region
               </label>
-              <input
-                autoComplete="address-level1"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!country}
+              <SearchableSelect
+                disabled={!country || statesLoading || states.length === 0}
                 id="register-state"
-                list="register-state-options"
-                placeholder={!country ? "Enter country first" : statesLoading ? "Loading states..." : "Type to search state"}
-                required
-                type="text"
-                value={state}
-                onChange={(event) => {
-                  setState(event.target.value);
+                loading={statesLoading}
+                noOptionsLabel={!country ? "Select country first." : "No states found."}
+                onChange={(value) => {
+                  setState(value);
                   setCity("");
                 }}
+                options={states.map((stateOption) => stateOption.name)}
+                placeholder={!country ? "Select country first" : "Select state"}
+                searchPlaceholder="Search state"
+                value={state}
               />
-              <datalist id="register-state-options">
-                {stateOptions.map((stateOption) => (
-                  <option key={stateOption} value={stateOption} />
-                ))}
-              </datalist>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="register-city">
                 City
               </label>
-              <input
-                autoComplete="address-level2"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none disabled:bg-slate-100"
-                disabled={!country || !state}
+              <SearchableSelect
+                disabled={!country || !state || citiesLoading || cities.length === 0}
                 id="register-city"
-                list="register-city-options"
-                placeholder={
-                  !country
-                    ? "Enter country first"
-                    : !state
-                      ? "Enter state first"
-                      : citiesLoading
-                        ? "Loading cities..."
-                        : "Type to search city"
-                }
-                required
-                type="text"
+                loading={citiesLoading}
+                noOptionsLabel={!state ? "Select state first." : "No cities found."}
+                onChange={setCity}
+                options={cities}
+                placeholder={!state ? "Select state first" : "Select city"}
+                searchPlaceholder="Search city"
                 value={city}
-                onChange={(event) => setCity(event.target.value)}
               />
-              <datalist id="register-city-options">
-                {cityOptions.map((cityOption) => (
-                  <option key={cityOption} value={cityOption} />
-                ))}
-              </datalist>
             </div>
 
             <div className="sm:col-span-3">
